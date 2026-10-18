@@ -1,0 +1,20 @@
+.build/
+.swiftpm/
+.DS_Store
+*.xcodeproj/
+.impeccable/review/
+*.app/
+*.zip
+*.recipevault
+*.log
+.env
+.env.*
+
+# Local vaults and development fixtures do not belong in source control.
+/library.json
+/backups.json
+/organization.json
+/Backups/
+/Covers/
+/work/
+/RecipeVault-before-restore-*/
