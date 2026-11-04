@@ -5,9 +5,25 @@ public enum RecipeWireCodec {
     public static let whiteBalanceCodes: [String: Int] = ["Auto":2,"Auto (white priority)":32800,"Auto (ambience priority)":32801,"Daylight":4,"Incandescent":6,"Underwater":8,"Fluorescent 1":32769,"Fluorescent 2":32770,"Fluorescent 3":32771,"Shade":32774,"Kelvin":32775,"Custom 1":32776,"Custom 2":32777,"Custom 3":32778]
     public static let nrCodes: [Int: Int] = [-4:32768,-3:28672,-2:16384,-1:12288,0:8192,1:4096,2:0,3:24576,4:20480]
     public static let fieldCodes: [RecipeField: UInt16] = [.dynamicRange:0xD190,.dRangePriority:0xD191,.filmSimulation:0xD192,.monoWC:0xD193,.monoMG:0xD194,.grainRoughness:0xD195,.grainSize:0xD195,.colorChromeEffect:0xD196,.colorChromeFXBlue:0xD197,.smoothSkin:0xD198,.whiteBalance:0xD199,.wbShiftR:0xD19A,.wbShiftB:0xD19B,.kelvin:0xD19C,.highlight:0xD19D,.shadow:0xD19E,.color:0xD19F,.sharpness:0xD1A0,.highISONR:0xD1A1,.clarity:0xD1A2]
+    /// X-M5 firmware 1.30 stores DR Auto as 0xFFFF: a bank set to Auto on the camera read this with priority Off,
+    /// and the camera refused 0, the value listed for other bodies.
+    public static let dynamicRangeCodes: [String: Int] = ["DR-Auto":0xFFFF,"DR100":100,"DR200":200,"DR400":400]
     public static let monochromeCodes: Set<Int> = [6,7,8,9,10,12,13,14,15]
     public static let writeOrder: [UInt16] = [0xD192,0xD191,0xD190,0xD193,0xD194,0xD195,0xD196,0xD197,0xD199,0xD19C,0xD19A,0xD19B,0xD19D,0xD19E,0xD19F,0xD1A0,0xD1A1,0xD1A2]
     public static var writableProperties: Set<UInt16> { Set(writeOrder) }
+
+    /// Grain reads back as 6 for Off but only 1 may be written, so the two count as the same setting.
+    public static func writableValue(property: UInt16, value: Data) -> Data {
+        property == 0xD195 && value == PTP.u16(6) ? PTP.u16(1) : value
+    }
+    public static func equivalent(property: UInt16, _ first: Data?, _ second: Data?) -> Bool {
+        guard let first, let second else { return first == second }
+        return writableValue(property: property, value: first) == writableValue(property: property, value: second)
+    }
+    public static func label(for property: UInt16) -> String {
+        if property == 0xD195 { return "Grain" }
+        return fieldCodes.first { $0.value == property }?.key.label ?? String(format: "Property 0x%04X", property)
+    }
 
     public static func encode(_ recipe: Recipe, baseline: CameraSlotSnapshot) throws -> (writes: [PTPPropertyWrite], warnings: [String]) {
         var values: [UInt16: PTPPropertyWrite] = [:]; var warnings: [String] = []
@@ -40,7 +56,7 @@ public enum RecipeWireCodec {
             switch field {
             case .filmSimulation: number = try lookup(field,value,filmCodes)
             case .whiteBalance: number = try lookup(field,value,whiteBalanceCodes)
-            case .dynamicRange: number = try lookup(field,value,["DR-Auto":0,"DR100":100,"DR200":200,"DR400":400])
+            case .dynamicRange: number = try lookup(field,value,dynamicRangeCodes)
             case .dRangePriority: number = try lookup(field,value,["Off":0,"Weak":1,"Strong":2,"Auto":32768])
             case .colorChromeEffect,.colorChromeFXBlue: number = try lookup(field,value,["Off":1,"Weak":2,"Strong":3])
             default:
@@ -71,17 +87,24 @@ public enum RecipeWireCodec {
         func enumValue(_ mapping: [String:Int], _ n: Int) -> String? { mapping.first { $0.value == n }?.key }
         let signed: Set<RecipeField> = [.monoWC,.monoMG,.wbShiftR,.wbShiftB,.highlight,.shadow,.color,.sharpness,.clarity]
         for field in RecipeField.allCases {
-            guard field != .grainSize, field != .grainRoughness, field != .smoothSkin, let code = fieldCodes[field], let data = snapshot.properties[code], let n = try? PTP.scalar(data,signed:signed.contains(field)), n != -32768, n != 65535 else { continue }
+            guard field != .grainSize, field != .grainRoughness, field != .smoothSkin, let code = fieldCodes[field], let data = snapshot.properties[code], let n = try? PTP.scalar(data,signed:signed.contains(field)), n != -32768, (n != 65535 || field == .dynamicRange) else { continue }
             switch field {
             case .filmSimulation: settings[field] = enumValue(filmCodes,n)
             case .whiteBalance: settings[field] = enumValue(whiteBalanceCodes,n)
-            case .dynamicRange: settings[field] = enumValue(["DR-Auto":0,"DR100":100,"DR200":200,"DR400":400],n)
+            case .dynamicRange: settings[field] = enumValue(dynamicRangeCodes,n)
             case .dRangePriority: settings[field] = enumValue(["Off":0,"Weak":1,"Strong":2,"Auto":32768],n)
             case .colorChromeEffect,.colorChromeFXBlue: settings[field] = enumValue(["Off":1,"Weak":2,"Strong":3],n)
             case .highISONR: settings[field] = nrCodes.first { $0.value == n }.map { String($0.key) }
             case .kelvin,.wbShiftR,.wbShiftB: settings[field] = String(n)
             default: settings[field] = n % 10 == 0 ? String(n / 10) : String(Double(n) / 10)
             }
+        }
+        // A bank keeps values its current mode ignores. They aren't part of the recipe.
+        // While D range priority is on, 0xD190 reads 0xFFFF as a placeholder, not DR Auto.
+        if let priority = settings[.dRangePriority], priority != "Off" { settings[.dynamicRange] = nil }
+        if settings[.whiteBalance] != "Kelvin" { settings[.kelvin] = nil }
+        if let simulation = settings[.filmSimulation], let code = filmCodes[simulation], !monochromeCodes.contains(code) {
+            settings[.monoWC] = nil; settings[.monoMG] = nil
         }
         if let data = snapshot.properties[0xD195], let grain = try? PTP.scalar(data) {
             settings[.grainRoughness] = [1:"Off",6:"Off",2:"Weak",3:"Strong",4:"Weak",5:"Strong"][grain]

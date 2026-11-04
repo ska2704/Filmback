@@ -240,4 +240,25 @@ final class LibraryOrganizationTests: XCTestCase {
             XCTAssertEqual(try Data(contentsOf: outside), original)
         }
     }
+
+    func testLoadedCatalogTracksEditsDeletesAndReopen() throws {
+        try withTemporaryOrganization { root, organization in
+            let slots = (1...4).map { RecipeKitSlot(slot: $0, recipe: Recipe(name: "Bank \($0)")) }
+            let kit = try organization.saveKit(name: "Outing", slots: slots)
+            XCTAssertFalse(organization.isLoaded(kit))
+            try organization.markLoaded(kit.id, at: kit.updatedAt.addingTimeInterval(1))
+            XCTAssertTrue(organization.isLoaded(try XCTUnwrap(organization.kits.first)))
+            XCTAssertTrue(LibraryOrganization(root: root).isLoaded(try XCTUnwrap(organization.kits.first)), "the record survives a restart")
+            var edited = slots; edited[0].recipe.name = "Changed"
+            try organization.updateKit(kit.id, name: "Outing", slots: edited)
+            let updated = try XCTUnwrap(organization.kits.first)
+            try organization.markLoaded(kit.id, at: updated.updatedAt.addingTimeInterval(-1))
+            XCTAssertFalse(organization.isLoaded(updated), "a catalog edited after loading no longer matches the camera")
+            try organization.clearLoaded()
+            XCTAssertNil(organization.loadedCatalog)
+            try organization.markLoaded(kit.id)
+            try organization.deleteKit(kit.id)
+            XCTAssertNil(organization.loadedCatalog)
+        }
+    }
 }

@@ -18,8 +18,25 @@ public struct PhotoInspection: Sendable {
 public enum FujifilmPhotoInspector {
     public static let maximumFileBytes = 80 * 1_024 * 1_024
 
+    /// A RAF stores a full camera JPEG. Its offset and length are big-endian values in the fixed header.
+    public static func embeddedJPEG(inRAF data: Data) throws -> Data {
+        guard data.starts(with: Data("FUJIFILMCCD-RAW ".utf8)) else { throw failure("This is not a Fujifilm RAF file.") }
+        guard data.count >= 92 else { throw failure("This RAF header is incomplete.") }
+        func u32(_ at: Int) -> Int { (0..<4).reduce(0) { $0 << 8 | Int(data[data.startIndex + at + $1]) } }
+        let offset = u32(84), length = u32(88)
+        guard offset >= 92, length > 0, offset <= data.count, length <= data.count - offset else { throw failure("This RAF doesn't point to a valid embedded JPEG.") }
+        return data.subdata(in: (data.startIndex + offset)..<(data.startIndex + offset + length))
+    }
+
+    /// Accepts an original camera JPEG or RAF.
+    public static func inspect(_ data: Data, filename: String) throws -> PhotoInspection {
+        data.starts(with: Data("FUJIFILMCCD-RAW ".utf8))
+            ? try inspectJPEG(embeddedJPEG(inRAF: data), filename: filename)
+            : try inspectJPEG(data, filename: filename)
+    }
+
     public static func inspectJPEG(_ data: Data, filename: String) throws -> PhotoInspection {
-        guard data.count <= maximumFileBytes else { throw failure("Choose an original JPEG smaller than 80 MB.") }
+        guard data.count <= maximumFileBytes else { throw failure("Choose an original photo smaller than 80 MB.") }
         let tiffData = try jpegEXIF(data)
         let tiff = try TIFFReader(tiffData)
         let root = try tiff.directory(at: Int(tiff.u32(4)))
@@ -183,7 +200,7 @@ public enum FujifilmPhotoInspector {
     private static func jpegEXIF(_ data: Data) throws -> [UInt8] {
         let bytes = [UInt8](data)
         guard bytes.count >= 4, bytes[0] == 0xff, bytes[1] == 0xd8 else {
-            throw failure("Choose an original Fujifilm JPEG. RAF, HEIF, screenshots, and edited exports are not supported by photo inspection; screenshots can use recipe import instead.")
+            throw failure("Choose an original Fujifilm JPEG or RAF. HEIF, screenshots, and edited exports are not supported by photo inspection; screenshots can use recipe import instead.")
         }
         var position = 2
         var segments = 0

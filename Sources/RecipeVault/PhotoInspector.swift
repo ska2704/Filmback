@@ -19,7 +19,7 @@ struct PhotoInspectorView: View {
             VStack(alignment: .leading, spacing: 7) {
                 Label("Inspect a photograph", systemImage: "photo")
                     .font(.system(size: 21, weight: .semibold)).foregroundStyle(Palette.sidebarText)
-                Text("Recover recorded Fujifilm settings from an original camera JPEG.")
+                Text("Recover recorded Fujifilm settings from an original camera JPEG or RAF.")
                     .font(.system(size: 12)).foregroundStyle(Palette.sidebarMuted)
             }.frame(maxWidth: .infinity, alignment: .leading).padding(24).background(Palette.graphite)
             ScrollView {
@@ -27,11 +27,11 @@ struct PhotoInspectorView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(filename.isEmpty ? "Choose a camera original" : filename).font(.system(size: 14, weight: .semibold))
-                            Text("JPEG · read locally · source file stays unchanged")
+                            Text("JPEG or RAF · read locally · source file stays unchanged")
                                 .font(.system(size: 12)).foregroundStyle(Palette.secondary)
                         }
                         Spacer()
-                        Button(filename.isEmpty ? "Choose JPEG…" : "Choose another…", action: choosePhoto).disabled(busy)
+                        Button(filename.isEmpty ? "Choose photo…" : "Choose another…", action: choosePhoto).disabled(busy)
                     }
                     if let inspection {
                         if !inspection.result.recipes[0].settings.isEmpty {
@@ -72,9 +72,9 @@ struct PhotoInspectorView: View {
                     } else if !busy {
                         VStack(alignment: .leading, spacing: 14) {
                             Text("Find the settings behind a photograph.").font(.system(size: 20, weight: .semibold))
-                            Text("Choose a JPEG copied directly from a Fujifilm camera or memory card. Review the recorded film simulation, tone, white balance, and other supported settings, then save them as an editable recipe.")
+                            Text("Choose a JPEG or RAF copied directly from a Fujifilm camera or memory card. Review the recorded film simulation, tone, white balance, and other supported settings, then save them as an editable recipe.")
                                 .font(.system(size: 13)).lineSpacing(4).foregroundStyle(Palette.secondary)
-                            StatusNote(text: "Edited exports and social media downloads may remove camera metadata. RAF and HEIF inspection is not available yet. To read a screenshot of recipe settings, use Import recipes.")
+                            StatusNote(text: "Edited exports and social media downloads may remove camera metadata. HEIF inspection is not available yet. To read a screenshot of recipe settings, use Import recipes.")
                             StatusNote(text: "Missing settings stay unspecified. A photograph does not reliably preserve a recipe name, its C1–C4 slot, or Auto ISO limits.")
                         }.padding(.top, 18)
                     }
@@ -90,21 +90,21 @@ struct PhotoInspectorView: View {
                     Button("Close") { task?.cancel(); dismiss() }.keyboardShortcut(.cancelAction)
                     Spacer()
                     Button("Add recovered recipe", action: save)
-                        .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                        .buttonStyle(.borderedProminent).tint(Palette.accent).keyboardShortcut(.defaultAction)
                         .disabled(busy || inspection?.result.recipes.first?.settings.isEmpty != false
                                   || recipeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }.padding(.horizontal, 24).padding(.vertical, 16).background(Palette.surface)
-        }.frame(width: 760, height: 680).background(Palette.paper).foregroundStyle(Palette.ink).tint(Palette.green)
+        }.frame(width: 760, height: 680).background(Palette.paper).foregroundStyle(Palette.ink).tint(Palette.graphite)
             .onDisappear { task?.cancel() }
     }
 
     private func choosePhoto() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.jpeg]
+        panel.allowedContentTypes = [.jpeg] + [UTType(filenameExtension: "raf")].compactMap { $0 }
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.message = "Choose an original Fujifilm camera JPEG. Settings are read locally."
+        panel.message = "Choose an original Fujifilm camera JPEG or RAF. Settings are read locally."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         busy = true; error = nil; inspection = nil; filename = url.lastPathComponent; showUnrecognized = false
         task = Task { @MainActor in
@@ -129,18 +129,18 @@ struct PhotoInspectorView: View {
 enum PhotoInspectionInput {
     static func inspect(_ url: URL) async throws -> PhotoInspection {
         let worker = Task.detached(priority: .userInitiated) {
-            guard url.isFileURL else { throw RecipeImportError.invalid("Choose a local original JPEG file.") }
+            guard url.isFileURL else { throw RecipeImportError.invalid("Choose a local original photo.") }
             let access = url.startAccessingSecurityScopedResource()
             defer { if access { url.stopAccessingSecurityScopedResource() } }
             try Task.checkCancellation()
             let attributes = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
-            guard attributes.isRegularFile == true else { throw RecipeImportError.invalid("Choose a regular JPEG file.") }
+            guard attributes.isRegularFile == true else { throw RecipeImportError.invalid("Choose a regular photo file.") }
             guard (attributes.fileSize ?? Int.max) <= FujifilmPhotoInspector.maximumFileBytes else {
-                throw RecipeImportError.invalid("Choose an original JPEG smaller than 80 MB.")
+                throw RecipeImportError.invalid("Choose an original photo smaller than 80 MB.")
             }
             let data = try Data(contentsOf: url, options: .mappedIfSafe)
             try Task.checkCancellation()
-            return try FujifilmPhotoInspector.inspectJPEG(data, filename: url.lastPathComponent)
+            return try FujifilmPhotoInspector.inspect(data, filename: url.lastPathComponent)
         }
         return try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
     }

@@ -95,7 +95,16 @@ final class VaultStore: ObservableObject {
     @discardableResult
     func saveSlots(_ slots: [CameraSlotSnapshot], camera: PTPDeviceInfo, title: String) throws -> BackupRecord {
         let data = try encoder.encode(SlotArchive(camera: camera, slots: slots))
-        return try savePayload(data, title: title, kind: .recipeSlots, camera: camera, ext: "json")
+        let record = try savePayload(data, title: title, kind: .recipeSlots, camera: camera, ext: "json")
+        try verifySlotBackup(record, slots: slots, camera: camera)
+        return record
+    }
+
+    func verifySlotBackup(_ record: BackupRecord, slots: [CameraSlotSnapshot], camera: PTPDeviceInfo) throws {
+        let saved = try archive(record)
+        guard saved.camera == camera, saved.slots == slots else {
+            throw VaultError.message("The saved recipe-bank backup does not match the camera snapshot. Camera writing is blocked.")
+        }
     }
 
     @discardableResult
@@ -132,6 +141,13 @@ final class VaultStore: ObservableObject {
         let archive = try JSONDecoder().decode(SlotArchive.self, from: payload(backup))
         guard archive.formatVersion == 1 else { throw VaultError.message("Unsupported backup version.") }
         return archive
+    }
+
+    /// C1–C4 from a stored backup, or nil when the file isn't a format RecipeVault can read.
+    func banks(in backup: BackupRecord) -> [CameraSlotSnapshot]? {
+        if backup.kind == .recipeSlots { return (try? archive(backup))?.slots }
+        guard let data = try? payload(backup) else { return nil }
+        return try? XM5BackupDecoder.decode(data)
     }
 
     private func load<T: Decodable>(_ type: T.Type, from name: String) throws -> T? {

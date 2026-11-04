@@ -56,10 +56,24 @@ public enum PTP {
         parameters.forEach { d.append(u32($0)) }; return d
     }
     public static func validateResponse(_ data: Data, transaction: UInt32) throws {
+        let (code, received) = try responseHeader(data)
+        guard received == transaction else { throw PTPError.malformed("PTP response transaction mismatch") }
+        guard code == 0x2001 else { throw PTPError.response(code) }
+    }
+    @discardableResult
+    public static func validateImageCaptureCoreResponse(_ data: Data) throws -> UInt32 {
+        // ImageCaptureCore assigns the wire transaction ID. Its per-request callback correlates the response.
+        // Apple PTPPassThrough sample, PTPProtocolHelpers.h: transactionID documentation.
+        let (code, received) = try responseHeader(data)
+        guard code == 0x2001 else { throw PTPError.response(code) }
+        return received
+    }
+    private static func responseHeader(_ data: Data) throws -> (code: UInt16, transaction: UInt32) {
+        guard (12...32).contains(data.count), (data.count - 12) % 4 == 0 else { throw PTPError.malformed("invalid PTP response length") }
         var r = PTPReader(data)
         let length = try r.u32(), kind = try r.u16(), code = try r.u16(), received = try r.u32()
-        guard length >= 12, length == data.count, kind == 3, received == transaction else { throw PTPError.malformed("PTP response header or transaction mismatch") }
-        guard code == 0x2001 else { throw PTPError.response(code) }
+        guard length == data.count, kind == 3 else { throw PTPError.malformed("invalid PTP response header") }
+        return (code, received)
     }
     public static func scalar(_ data: Data, signed: Bool = false) throws -> Int {
         guard data.count == 2 else { throw PTPError.malformed("expected a 16-bit property") }
@@ -143,6 +157,11 @@ public struct CameraSlotSnapshot: Codable, Identifiable, Equatable {
         self.slot = slot; self.name = name; self.properties = properties; self.readErrors = readErrors
     }
     public var recipe: Recipe { RecipeWireCodec.decode(self) }
+    /// After a power cycle the live properties can hold these until the bank selector is written. They aren't a recipe.
+    /// Only film counts: 0xD190 = 0xFFFF alone may be a real setting on this body, such as DR Auto.
+    public var holdsPlaceholders: Bool {
+        properties[0xD192] == PTP.u16(0x8000)
+    }
 }
 
 public struct PTPPropertyWrite: Identifiable, Equatable {

@@ -36,15 +36,21 @@ struct RecipeKit: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+struct LoadedCatalog: Codable, Equatable, Sendable {
+    var kitID: UUID
+    var loadedAt: Date
+}
+
 struct LibraryOrganizationState: Codable, Equatable, Sendable {
     var formatVersion = 1
     var favoriteIDs: Set<UUID> = []
     var collections: [RecipeCollection] = []
     var kits: [RecipeKit] = []
+    var loadedCatalog: LoadedCatalog?
 
     init() {}
 
-    private enum CodingKeys: String, CodingKey { case formatVersion, favoriteIDs, collections, kits }
+    private enum CodingKeys: String, CodingKey { case formatVersion, favoriteIDs, collections, kits, loadedCatalog }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -52,6 +58,7 @@ struct LibraryOrganizationState: Codable, Equatable, Sendable {
         favoriteIDs = try values.decodeIfPresent(Set<UUID>.self, forKey: .favoriteIDs) ?? []
         collections = try values.decodeIfPresent([RecipeCollection].self, forKey: .collections) ?? []
         kits = try values.decodeIfPresent([RecipeKit].self, forKey: .kits) ?? []
+        loadedCatalog = try values.decodeIfPresent(LoadedCatalog.self, forKey: .loadedCatalog)
         try validate()
     }
 
@@ -110,6 +117,7 @@ final class LibraryOrganization: ObservableObject {
     var favoriteIDs: Set<UUID> { state.favoriteIDs }
     var collections: [RecipeCollection] { state.collections }
     var kits: [RecipeKit] { state.kits }
+    var loadedCatalog: LoadedCatalog? { state.loadedCatalog }
     private var fileURL: URL { root.appendingPathComponent("organization.json") }
 
     init(root: URL) {
@@ -195,7 +203,25 @@ final class LibraryOrganization: ObservableObject {
     }
 
     func deleteKit(_ kitID: UUID) throws {
-        try mutate { $0.kits.removeAll { $0.id == kitID } }
+        try mutate { next in
+            next.kits.removeAll { $0.id == kitID }
+            if next.loadedCatalog?.kitID == kitID { next.loadedCatalog = nil }
+        }
+    }
+
+    /// Records the catalog verified on the camera. Editing the catalog later clears the match.
+    func markLoaded(_ kitID: UUID, at date: Date = Date()) throws {
+        try mutate { $0.loadedCatalog = LoadedCatalog(kitID: kitID, loadedAt: date) }
+    }
+
+    /// Call before anything else changes the banks, so "On camera" can't outlive what's on the camera.
+    func clearLoaded() throws {
+        try mutate { $0.loadedCatalog = nil }
+    }
+
+    func isLoaded(_ kit: RecipeKit) -> Bool {
+        guard let loaded = state.loadedCatalog, loaded.kitID == kit.id else { return false }
+        return kit.updatedAt <= loaded.loadedAt
     }
 
     func removeRecipeReferences(_ recipeID: UUID) throws {

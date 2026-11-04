@@ -1,5 +1,44 @@
 # Validation
 
+## Version 0.5 catalogs, 4 November 2026
+
+`swift test --build-system native` passed **153 tests, zero failures**, including two optional checks against real files kept out of the repository: a Tether App backup against live reads of all four banks, and a real X-S20 RAF. The decoder was fitted to those same live reads, so that check confirms the fit rather than proving it independently. A baseline run on the earlier code didn't finish, so the last earlier result is the 124 recorded below.
+
+Hardware, firmware 1.30, using separate test tools and not this app: `GetObject(0)` matched a Tether App backup byte for byte. Selector writes to C1, C2, C4 and back to C3 read back correctly, and the settings object afterwards differed from the backup by one byte outside the bank data. The next `GetObject(0)` straight after those selector writes got no data and left the camera's USB unresponsive until its battery was removed. The cause is unknown.
+
+In the installed 0.5 app on the same camera, Connect and Read C1–C4 showed all four bank names, with no USB errors logged, and comparing the catalog with that read showed only the settings this read can't see.
+
+Dynamic range: the first load attempt on 4 November stopped when the camera answered `0x201C` to DR Auto sent as 0. DR400 was then also refused with AUTO ISO capped at 400, and accepted once AUTO was 640–6400. DR Auto sent as 65535 was then accepted too. Each write was confirmed by the app reading the banks back.
+
+Catalog loads then worked in the app for a one-setting change: C4 clarity went from -2 to -1 and back, confirmed on the camera's screen for -1 and by the app's saved reads. C1, C2 and C3 didn't change, and no USB errors were logged.
+
+A full catalog, People & Interiors, then loaded in the app. A separate bank read afterwards matched the requested values on all 65 compared values across C1–C4, including names, film simulation, white balance, shifts, half-step tone and grain Off, which was written as 1 and read back as 6. No settings outside the load changed, and no USB errors were logged. The catalog's film and white balance modes were Classic Chrome, Nostalgic Negative, Eterna, Reala Ace, Auto, Auto White Priority and Kelvin.
+
+**Not tested on the camera:** other film simulations and white balance modes (including Daylight and Fluorescent 3), Acros and other monochrome recipes, DR200, DR Auto with a lower ISO range, Grain Large, and restoring a backup.
+
+An independent read-through of the write path found nine issues, all fixed with tests. They include white balance shifts that could be wrong after a mode change, an "On camera" label that could go stale, and placeholder values being accepted as a recipe. That review only read the code.
+
+UI review covered release captures of Library, Catalogs and Camera in the new palette. Sheets, including the catalog review, comparison and backup viewer, have not been visually checked.
+
+
+## X-M5 descriptor fallback and recovery guard, 24 October 2026
+
+`swift test --build-system native` passed **124 tests, zero failures**. The new service-level camera-safety tests cover: the `0x2002` fallback planning and applying a write with backup-first ordering and read-back; Kelvin values outside the researched range (2000 K, 5555 K) refused; other descriptor errors (`0x2005`) not falling back; an unverified capability generation (`X-M5_0200`) refused; an unmapped baseline film simulation (`0x8000`) blocking overwrite while unrelated fields stay writable; a saved bank holding an unmapped value refused for restore; a failed selector restore invalidating the session; and an out-of-range selector refusing any bank change. Profile unit tests, backup re-read verification and transport-invalidation tests are included.
+
+The rebuilt release app was launched on the Mac. It has **not** yet read C1–C4 or written a bank on the physical X-M5, and the camera's `0xD186`/`0xD187` capability strings have not been read. The C1 values read earlier today include film simulation `0x8000` and DR priority Auto, which this guard treats as not exactly restorable, so a write that changes the film simulation, DR, highlight or shadow on that bank would currently be refused.
+
+## Initial X-M5 hardware check, 24 October 2026
+
+The transport correction passed all **102 tests**, including 19 PTP tests and all eight simulated camera-safety tests. Regression fixtures cover the observed framework-assigned transaction IDs, malformed framing and preserved camera errors. An independent source review found no material transport regression. The rebuilt, ad-hoc-signed release app was launched and connected successfully to the physical X-M5 through its Camera view, displaying firmware 1.30 and the camera identity. No bank-read or recipe-write action was invoked in that UI check.
+
+A connected Fujifilm X-M5 on firmware 1.30 was identified with a nonempty serial and USB mode `0xD16E = 6`. Read-only probes confirmed GetDeviceInfo and all current-bank values in `0xD18C`–`0xD1A4`. The selector was 1. No selector or recipe-setting writes were sent.
+
+ImageCaptureCore replaced app transaction IDs 1 and 42 with consecutive wire IDs, confirming Apple's documented transport behavior. This exposed and led to correction of the app's exact-ID check at the ImageCaptureCore boundary. Strict response framing, error handling and session/request correlation remain enforced; raw PTP retains exact transaction matching.
+
+GetDevicePropDesc returned GeneralError `0x2002` for every property in `0xD18C`–`0xD1A4`, although the operation and properties were advertised. The existing descriptor requirement therefore blocks bank switching and recipe writes. This check does not establish C1–C4 write compatibility, saved-bank persistence or restoration.
+
+GetObjectInfo(0) reported format `0x5000` and 67,452 bytes; GetObject(0) returned that exact length. The object was saved privately as experimental diagnostic data. It is not a verified Fujifilm restore file. Camera serial, bank bytes and downloaded settings are excluded from the repository.
+
 ## Version 0.4 toolkit
 
 The 18 October 2026 implementation adds favourites, collections, library filters and sorting; C1–C4 kit snapshots; saved-value comparison; PDF/text sharing; local original-JPEG EXIF/MakerNote inspection; portable `.recipevault` export/restore; and X RAW Studio handoff. The existing four recipes and their approximate covers are retained. Public catalogue browsing remains deferred.
@@ -12,7 +51,7 @@ An independent source review found no material issues. The visual finish review 
 
 The JPEG parser was also compared with ExifTool's public legacy Fujifilm sample. Camera metadata and the two recoverable recipe fields matched; other values remained unspecified. An original X-M5 JPEG is still required to verify modern fields against this camera. The app has no ExifTool runtime dependency.
 
-No physical X-M5 verification is claimed. Camera compatibility still requires the real-device checks described below.
+At the time of the 0.4 toolkit release, no physical X-M5 verification was claimed. The later read-only findings above do not establish write or restore compatibility.
 
 ## Earlier release validation
 

@@ -236,4 +236,42 @@ final class VaultStoreTests: XCTestCase {
             }
         }
     }
+
+    func testVerifiedSlotBackupPreservesEveryBankAndUnknownRawValues() async throws {
+        try withTemporaryVault { root, store in
+            let camera = PTPDeviceInfo(manufacturer: "FUJIFILM", model: "X-M5", deviceVersion: "1.30",
+                                       serialNumber: "FIXTURE", operations: [0x1015], properties: [0xD192, 0xD195])
+            let slots = (1...4).map {
+                CameraSlotSnapshot(slot: $0, name: "Original \($0)",
+                                   properties: [0xD192: PTP.u16(0x8000), 0xD195: PTP.u16(6)])
+            }
+            let record = try store.saveSlots(slots, camera: camera, title: "Before changing camera")
+            let reopened = VaultStore(root: root)
+            try reopened.verifySlotBackup(record, slots: slots, camera: camera)
+            XCTAssertEqual(try reopened.archive(record).slots, slots)
+            XCTAssertEqual(reopened.backups.first?.id, record.id)
+        }
+    }
+
+    func testSlotBackupVerificationRejectsDamagedBytesAndDifferentSnapshot() async throws {
+        try withTemporaryVault { root, store in
+            let camera = PTPDeviceInfo(manufacturer: "FUJIFILM", model: "X-M5", deviceVersion: "1.30",
+                                       serialNumber: "FIXTURE", operations: [0x1015], properties: [0xD192])
+            let slots = [CameraSlotSnapshot(slot: 1, name: "Original", properties: [0xD192: PTP.u16(11)])]
+            let record = try store.saveSlots(slots, camera: camera, title: "Original bank")
+            let changedSlots = [CameraSlotSnapshot(slot: 1, name: "Original", properties: [0xD192: PTP.u16(20)])]
+            XCTAssertThrowsError(try store.verifySlotBackup(record, slots: changedSlots, camera: camera)) { error in
+                XCTAssertTrue(error.localizedDescription.contains("does not match"))
+            }
+            let otherCamera = PTPDeviceInfo(manufacturer: "FUJIFILM", model: "X-M5", deviceVersion: "1.30",
+                                            serialNumber: "OTHER", operations: [0x1015], properties: [0xD192])
+            XCTAssertThrowsError(try store.verifySlotBackup(record, slots: slots, camera: otherCamera))
+
+            let payloadURL = root.appendingPathComponent("Backups").appendingPathComponent(record.payloadName)
+            try Data("damaged".utf8).write(to: payloadURL)
+            XCTAssertThrowsError(try store.verifySlotBackup(record, slots: slots, camera: camera)) { error in
+                XCTAssertTrue(error.localizedDescription.contains("checksum"))
+            }
+        }
+    }
 }

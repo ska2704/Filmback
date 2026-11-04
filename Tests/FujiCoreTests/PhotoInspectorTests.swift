@@ -191,6 +191,34 @@ final class PhotoInspectorTests: XCTestCase {
         let payload = [69, 120, 105, 102, 0, 0] + tiff
         return Data([0xff, 0xd8, 0xff, 0xe1] + Self.encoded(UInt32(payload.count + 2), width: 2, littleEndian: false) + payload + [0xff, 0xd9])
     }
+
+    private func raf(jpeg: Data, offset: UInt32? = nil, length: UInt32? = nil) -> Data {
+        func big(_ value: UInt32) -> Data { Data((0..<4).map { UInt8(truncatingIfNeeded: value >> (24 - $0 * 8)) }) }
+        var data = Data("FUJIFILMCCD-RAW ".utf8) + Data(count: 68)
+        data += big(offset ?? 148); data += big(length ?? UInt32(jpeg.count))
+        data += Data(count: 148 - data.count)
+        return data + jpeg
+    }
+
+    func testRAFExposesItsEmbeddedJPEG() throws {
+        let jpeg = Data([0xFF, 0xD8, 0x01, 0x02, 0xFF, 0xD9])
+        XCTAssertEqual(try FujifilmPhotoInspector.embeddedJPEG(inRAF: raf(jpeg: jpeg)), jpeg)
+    }
+
+    func testDamagedRAFIsRefused() {
+        let jpeg = Data([0xFF, 0xD8, 0xFF, 0xD9])
+        XCTAssertThrowsError(try FujifilmPhotoInspector.embeddedJPEG(inRAF: Data("FUJIFILMCCD-RAW ".utf8)))
+        XCTAssertThrowsError(try FujifilmPhotoInspector.embeddedJPEG(inRAF: raf(jpeg: jpeg, length: 4096)))
+        XCTAssertThrowsError(try FujifilmPhotoInspector.embeddedJPEG(inRAF: raf(jpeg: jpeg, offset: 0)))
+        XCTAssertThrowsError(try FujifilmPhotoInspector.embeddedJPEG(inRAF: raf(jpeg: jpeg, offset: UInt32.max)))
+    }
+
+    /// Set RECIPEVAULT_RAF_FIXTURE to check a real RAF, which stays out of the repository.
+    func testRealRAFSettingsAreRead() throws {
+        guard let path = ProcessInfo.processInfo.environment["RECIPEVAULT_RAF_FIXTURE"] else { throw XCTSkip("No RAF fixture configured.") }
+        let result = try FujifilmPhotoInspector.inspect(Data(contentsOf: URL(fileURLWithPath: path)), filename: "fixture.raf")
+        XCTAssertNotNil(result.result.recipes.first?.settings[.filmSimulation])
+    }
 }
 
 private extension Array where Element == UInt8 {

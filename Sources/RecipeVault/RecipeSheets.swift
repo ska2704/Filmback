@@ -45,12 +45,12 @@ struct RecipeEditor: View {
                     Spacer()
                     Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                     Button("Save recipe", action: save)
-                        .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                        .buttonStyle(.borderedProminent).tint(Palette.accent).keyboardShortcut(.defaultAction)
                         .disabled(recipe.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || recipe.settings.isEmpty)
                 }
             }
         }
-        .frame(width: 700, height: 660).background(Palette.paper).foregroundStyle(Palette.ink).tint(Palette.green)
+        .frame(width: 700, height: 660).background(Palette.paper).foregroundStyle(Palette.ink).tint(Palette.graphite)
     }
 
     private func metadataRow(_ label: String, text: Binding<String>) -> some View {
@@ -150,12 +150,12 @@ struct ImportView: View {
                     Spacer()
                     if result != nil { Button("Back to text") { result = nil; error = nil } }
                     Button(result == nil ? "Review import" : "Add to library", action: reviewOrImport)
-                        .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                        .buttonStyle(.borderedProminent).tint(Palette.accent).keyboardShortcut(.defaultAction)
                         .disabled(busy || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }
-        .frame(width: 760, height: 660).background(Palette.paper).foregroundStyle(Palette.ink).tint(Palette.green)
+        .frame(width: 760, height: 660).background(Palette.paper).foregroundStyle(Palette.ink).tint(Palette.graphite)
     }
 
     private var sourceControls: some View {
@@ -182,7 +182,7 @@ struct ImportView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(result.warnings, id: \.self) { warning in
                             Label(warning, systemImage: "exclamationmark.triangle")
-                                .font(.system(size: 12)).foregroundStyle(Palette.amber).fixedSize(horizontal: false, vertical: true)
+                                .font(.system(size: 12)).foregroundStyle(Palette.ink).fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
@@ -280,9 +280,7 @@ struct WriteReviewView: View {
                             if !plan.warnings.isEmpty {
                                 Divider().padding(.vertical, 8)
                                 ForEach(plan.warnings, id: \.self) { warning in
-                                    Label(warning, systemImage: "exclamationmark.triangle")
-                                        .font(.system(size: 12)).foregroundStyle(Palette.amber)
-                                        .padding(.vertical, 5).fixedSize(horizontal: false, vertical: true)
+                                    CautionLabel(text: warning).padding(.vertical, 5)
                                 }
                             }
                         }.padding(.horizontal, 14)
@@ -296,10 +294,60 @@ struct WriteReviewView: View {
                 HStack {
                     Button("Cancel", action: onCancel).keyboardShortcut(.cancelAction)
                     Spacer()
-                    Button("Back up & write C\(plan.slot)", action: onApply).buttonStyle(.borderedProminent)
+                    Button("Back up & write C\(plan.slot)", action: onApply).buttonStyle(.borderedProminent).tint(Palette.accent)
                 }
             }
-        }.frame(width: 620, height: 650).background(Palette.paper).foregroundStyle(Palette.ink).tint(Palette.green)
+        }.frame(width: 620, height: 650).background(Palette.paper).foregroundStyle(Palette.ink).tint(Palette.graphite)
+    }
+}
+
+struct CatalogReviewView: View {
+    let plan: CatalogWritePlan
+    let onCancel: () -> Void
+    let onApply: () -> Void
+    private var warnings: [String] { Array(Set(plan.plans.flatMap(\.warnings))).sorted() }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            RecipeSheetHeader(title: "Load \(plan.catalogName)", symbol: "folder",
+                              subtitle: plan.changeCount == 0 ? "Your X-M5 already holds this catalog" : "\(plan.changeCount) changes across C1–C4")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text("RecipeVault saves all four banks first, writes each one, then reads every bank back to check it.")
+                        .font(.system(size: 13)).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
+                    ForEach(plan.plans) { bank in
+                        RecipeSheetSection(title: "C\(bank.slot) · \(bank.name)") {
+                            if bank.name != bank.before.name {
+                                row("Name", bank.name)
+                            }
+                            ForEach(bank.writes) { write in row(write.label, write.displayValue) }
+                            if bank.writes.isEmpty && bank.name == bank.before.name {
+                                Text("No change").font(.system(size: 12)).foregroundStyle(Palette.secondary)
+                                    .padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                    }
+                    ForEach(warnings, id: \.self) { CautionLabel(text: $0) }
+                }.padding(24)
+            }
+            RecipeSheetFooter {
+                Text("Keep the camera connected until verification finishes. If a write fails, some banks may have changed; the saved backup will remain available.")
+                    .font(.system(size: 12)).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button("Cancel", action: onCancel).keyboardShortcut(.cancelAction)
+                    Spacer()
+                    Button("Back up & load catalog", action: onApply).buttonStyle(.borderedProminent).tint(Palette.accent).disabled(plan.changeCount == 0)
+                }
+            }
+        }.frame(width: 620, height: 680).background(Palette.paper).foregroundStyle(Palette.ink).tint(Palette.graphite)
+    }
+
+    private func row(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 18) {
+            Text(label)
+            Spacer(minLength: 8)
+            Text(value).fontWeight(.medium).multilineTextAlignment(.trailing).monospacedDigit()
+        }.font(.system(size: 13)).padding(.vertical, 7)
     }
 }
 
@@ -348,6 +396,6 @@ private struct RecipeSheetFooter<Content: View>: View {
 
 private func sheetError(_ message: String) -> some View {
     Label(message, systemImage: "exclamationmark.circle")
-        .font(.system(size: 12)).foregroundStyle(.red).textSelection(.enabled)
+        .font(.system(size: 12)).foregroundStyle(Palette.accent).textSelection(.enabled)
         .fixedSize(horizontal: false, vertical: true)
 }

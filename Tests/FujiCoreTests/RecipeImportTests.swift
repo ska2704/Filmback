@@ -233,4 +233,14 @@ final class RecipeImportTests: XCTestCase {
             String(alphabet[bits[start..<(start + 5)].reduce(0) { ($0 << 1) | $1 }])
         }.joined()
     }
+
+    func testRecipeDiffIgnoresInactiveAndEquivalentValues() {
+        let camera = Recipe(name: "bank", settings: [.highlight: "2", .color: "1", .kelvin: "4500", .whiteBalance: "Auto", .grainRoughness: "Off"])
+        let target = Recipe(name: "new", settings: [.highlight: "2.0", .color: "4", .kelvin: "6700", .whiteBalance: "Auto", .grainRoughness: "Off", .grainSize: "Small", .clarity: "-2"])
+        XCTAssertEqual(RecipeDiff.changes(from: camera, to: target), [
+            RecipeSettingChange(field: .clarity, current: nil, target: "-2"),
+            RecipeSettingChange(field: .color, current: "1", target: "4"),
+        ].sorted { a, b in RecipeField.allCases.firstIndex(of: a.field)! < RecipeField.allCases.firstIndex(of: b.field)! })
+        XCTAssertEqual(RecipeDiff.changes(from: nil, to: Recipe(name: "x", settings: [.color: "1"])).first?.current, nil)
+    }
 }
