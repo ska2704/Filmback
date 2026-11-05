@@ -31,7 +31,7 @@ struct CatalogsView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            folderList.frame(width: 248).background(Palette.paper)
+            folderList.frame(width: 222).background(Palette.paper)
             Divider()
             if let kit = selected { detail(kit) } else { emptyState }
         }
@@ -51,7 +51,7 @@ struct CatalogsView: View {
             }
         }
         .sheet(item: $comparing) { kit in
-            if let source = comparisonSource { CatalogDiffView(kit: kit, source: source.label, banks: source.banks) }
+            if let source = cameraSource { CatalogDiffView(kit: kit, source: source.description, banks: source.banks) }
         }
         .sheet(item: $inspecting) { recipe in
             VStack(alignment: .leading, spacing: 0) {
@@ -108,17 +108,22 @@ struct CatalogsView: View {
     }
 
     private func detail(_ kit: RecipeKit) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 6) {
+        let source = cameraSource
+        let statuses = Dictionary(uniqueKeysWithValues: kit.slots.map { entry -> (Int, RecipeDiff.BankStatus) in
+            let bank = source?.banks.first { $0.slot == entry.slot }
+            return (entry.slot, RecipeDiff.status(bankName: bank?.name, bank: bank?.recipe, target: entry.recipe))
+        })
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 5) {
                         Text(kit.name).font(.system(size: 25, weight: .semibold)).lineLimit(2).textSelection(.enabled)
-                        Text(status(kit)).font(.system(size: 12)).foregroundStyle(Palette.secondary)
+                        Text(status(kit).uppercased()).font(EdgeType.label(10)).foregroundStyle(Palette.secondary)
                     }
                     Spacer()
-                    Button("Edit") { editing = kit }
-                    Button("Compare") { comparing = kit }.disabled(comparisonSource == nil)
-                        .help(comparisonSource == nil ? "Read the camera or save a backup first" : "See what loading would change, without touching the camera")
+                    Button { comparing = kit } label: { Text("COMPARE").font(EdgeType.label(11)) }.disabled(source == nil)
+                        .help(source == nil ? "Read the camera or save a backup first" : "See every setting loading would change, without touching the camera")
+                    Button { editing = kit } label: { Text("EDIT").font(EdgeType.label(11)) }
                     Menu {
                         Button("Duplicate catalog") { attempt { selection = try organization.saveKit(name: kit.name + " copy", slots: kit.slots).id } }
                         Button("Add copies to library") {
@@ -129,33 +134,65 @@ struct CatalogsView: View {
                         Button("Delete catalog", role: .destructive) { deleting = kit }
                     } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).frame(width: 24)
                         .accessibilityLabel("Actions for \(kit.name)")
-                    Button { onLoad(kit) } label: { Label("Load to camera…", systemImage: "square.and.arrow.down.on.square") }
-                        .buttonStyle(.borderedProminent).tint(Palette.accent).disabled(!canWrite || kit.slots.count != 4)
-                        .help(kit.slots.count != 4 ? "Assign a recipe to all four banks first" : (canWrite ? "Review the changes before anything is written" : "Connect your X-M5 to load"))
-                }
-                Rectangle().fill(Palette.ink).frame(height: 1)
-                VStack(spacing: 0) {
-                    ForEach(1...4, id: \.self) { number in
-                        let entry = kit.slots.first { $0.slot == number }
-                        HStack(spacing: 18) {
-                            Text("C\(number)").font(.system(size: 19, weight: .medium, design: .monospaced)).frame(width: 44)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(entry?.recipe.name ?? "Empty").font(.system(size: 13, weight: .medium))
-                                Text(summary(entry?.recipe)).font(.system(size: 11)).foregroundStyle(Palette.secondary).lineLimit(1)
-                            }
-                            Spacer()
-                            if let entry {
-                                Button("Inspect") { inspecting = entry.recipe }
-                                Button("Edit copy") { editingBank = EditingBank(kitID: kit.id, slot: number, recipe: entry.recipe) }
-                                Button("Review C\(number)…") { onWrite(entry.recipe, number) }.disabled(!canWrite)
-                            }
-                        }.padding(.vertical, 15)
-                        Divider()
+                    VStack(alignment: .trailing, spacing: 5) {
+                        Button { onLoad(kit) } label: { Label("LOAD TO CAMERA…", systemImage: "square.and.arrow.down.on.square").font(EdgeType.label(11, weight: .semibold)) }
+                            .buttonStyle(.borderedProminent).tint(Palette.accent).disabled(!canWrite || kit.slots.count != 4)
+                            .help(kit.slots.count != 4 ? "Assign a recipe to all four banks first" : (canWrite ? "Review the changes before anything is written" : "Connect your X-M5 to load"))
+                        if let iso = minimumISO(kit) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Palette.accent).accessibilityHidden(true)
+                                Text("NEEDS ISO \(iso) OR HIGHER").foregroundStyle(Palette.ink)
+                            }.font(EdgeType.label(9, weight: .semibold))
+                                .help("Set the camera’s ISO, or its AUTO range, to at least \(iso) for this catalog’s dynamic range.")
+                        }
                     }
                 }
-                StatusNote(text: "A catalog keeps its own copy of each recipe, so editing the library won’t change it. Loading replaces the named recipe settings in C1–C4 and leaves other camera settings alone.")
-            }.padding(28).frame(maxWidth: .infinity, alignment: .leading)
+                Rectangle().fill(Palette.ink).frame(height: 1)
+
+                SheetHeading(chip: "ON CAMERA", text: source?.label ?? "NOT READ YET")
+                FilmStrip(edgeLabel: "ON CAMERA") { number in
+                    let bank = source?.banks.first { $0.slot == number }
+                    FilmCell(slot: number, name: bank.map { $0.name.isEmpty ? "Unnamed" : $0.name }, recipe: bank?.recipe, status: .unknown, emptyText: "Not read") { EmptyView() }
+                }
+
+                SheetHeading(chip: "THIS CATALOG", text: "TO BE LOADED: \(kit.name.uppercased())").padding(.top, 6)
+                FilmStrip(edgeLabel: "THIS CATALOG") { number in
+                    let entry = kit.slots.first { $0.slot == number }
+                    FilmCell(slot: number, name: entry?.recipe.name, recipe: entry?.recipe, status: statuses[number] ?? .unknown, emptyText: "Empty") {
+                        if let entry {
+                            Menu {
+                                Button("Inspect") { inspecting = entry.recipe }
+                                Button("Edit copy") { editingBank = EditingBank(kitID: kit.id, slot: number, recipe: entry.recipe) }
+                                Divider()
+                                Button("Review C\(number) only…") { onWrite(entry.recipe, number) }.disabled(!canWrite)
+                            } label: { Image(systemName: "ellipsis") }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                                .accessibilityLabel("Actions for C\(number)")
+                        }
+                    }
+                }
+
+                StatusNote(text: sheetSummary(statuses: statuses, source: source)).padding(.top, 4)
+            }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background { GrainTexture(color: Palette.graphite, opacity: 0.06) }
+    }
+
+    private func minimumISO(_ kit: RecipeKit) -> Int? {
+        let ranges = kit.slots.compactMap { $0.recipe.settings[.dynamicRange] }
+        if ranges.contains("DR400") { return 640 }
+        return ranges.contains("DR200") ? 320 : nil
+    }
+
+    private func sheetSummary(statuses: [Int: RecipeDiff.BankStatus], source: CameraBankSource?) -> String {
+        guard source != nil else { return "Read the camera or save a backup to see what this catalog would change. Loading always shows a full review first." }
+        func list(_ status: RecipeDiff.BankStatus) -> [String] { (1...4).filter { statuses[$0] == status }.map { "C\($0)" } }
+        var parts: [String] = []
+        let changed = list(.changed), unread = list(.notRead)
+        if changed.isEmpty && unread.isEmpty { parts.append("This catalog matches what RecipeVault last knew about the camera.") }
+        if !changed.isEmpty { parts.append("\(changed.joined(separator: ", ")) would change.") }
+        if !unread.isEmpty { parts.append("\(unread.joined(separator: ", ")) can’t be fully compared, because the last read didn’t include every setting.") }
+        parts.append("Changes made on the camera itself don’t show here until you read it again.")
+        return parts.joined(separator: " ")
     }
 
     private var emptyState: some View {
@@ -168,13 +205,10 @@ struct CatalogsView: View {
         }.padding(40).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 
-    /// The freshest saved view of the camera: this session's read, otherwise the newest readable backup.
-    private var comparisonSource: (label: String, banks: [CameraSlotSnapshot])? {
-        if !lastRead.isEmpty { return ("your last read of the camera", lastRead) }
-        for backup in store.backups {
-            if let banks = store.banks(in: backup) { return ("“\(backup.title)”, saved \(backup.createdAt.formatted(date: .abbreviated, time: .shortened))", banks) }
-        }
-        return nil
+    /// The freshest evidence of what's on the camera.
+    private var cameraSource: CameraBankSource? {
+        CameraBankSource.resolve(lastRead: lastRead, loaded: organization.loadedCatalog, kits: organization.kits,
+                                 backups: store.backups.compactMap { backup in store.banks(in: backup).map { (backup.title, backup.createdAt, $0) } })
     }
 
     private func status(_ kit: RecipeKit) -> String {
@@ -225,7 +259,7 @@ enum CatalogFile {
 struct CatalogDiffView: View {
     let kit: RecipeKit
     let source: String
-    let banks: [CameraSlotSnapshot]
+    let banks: [CameraBank]
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -238,7 +272,7 @@ struct CatalogDiffView: View {
             ScrollView { VStack(alignment: .leading, spacing: 22) {
                 ForEach(kit.slots) { entry in
                     let bank = banks.first { $0.slot == entry.slot }
-                    let changes = RecipeDiff.changes(from: bank?.recipe, to: entry.recipe)
+                    let changes = RecipeDiff.loadableChanges(from: bank?.recipe, to: entry.recipe)
                     BankDiffSection(title: "C\(entry.slot) · \(bank?.name ?? "Not read") → \(entry.recipe.name)", changes: changes, fromLabel: "On camera", toLabel: "Catalog")
                 }
             }.padding(24) }

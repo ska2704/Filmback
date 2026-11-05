@@ -6,6 +6,12 @@ RecipeVault is a native macOS working tool for one photographer’s Fujifilm X-M
 
 A compact camera workbench based on the silver X-M5: a black leatherette sidebar, satin and highlight silver working surfaces, thin divisions and precise alignment. The camera's physical controls and Fujifilm's film-exchange design rationale inform the interface; there are no imitation dials or official logos. Photo covers may illustrate a recipe's mood when explicitly labelled as approximate; they must never claim to predict the camera's exact output.
 
+## Load sheet (version 0.6)
+
+Catalogs are laid out around the decision made before a shoot: what's on the camera now, and what loading this catalog would change. Two film strips line up C1–C4, with ON CAMERA above THIS CATALOG. Each bank in the catalog strip is stamped CHANGED, NO CHANGE or NOT READ. Monospaced edge-print type marks labels and navigation, and recipe names stay in the regular typeface for easy reading. The sidebar and sheet carry a fine grain, so flat colour reads as leatherette and paper.
+
+ON CAMERA shows only what the app has evidence for, and says where it came from: this session's read, a later saved read, or a verified load. A setting the read couldn't see is never called changed. The app can't see changes made on the camera itself, and the sheet says so.
+
 ## Palette: Fujifilm X-M5 Silver
 
 Every interface colour comes from these seven values, defined in `DesignSystem.swift`.

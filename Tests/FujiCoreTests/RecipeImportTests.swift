@@ -243,4 +243,25 @@ final class RecipeImportTests: XCTestCase {
         ].sorted { a, b in RecipeField.allCases.firstIndex(of: a.field)! < RecipeField.allCases.firstIndex(of: b.field)! })
         XCTAssertEqual(RecipeDiff.changes(from: nil, to: Recipe(name: "x", settings: [.color: "1"])).first?.current, nil)
     }
+
+    func testBankStatusOnlyCallsRealDifferencesChanged() {
+        let target = Recipe(name: "Reala Stillness", settings: [.filmSimulation: "Reala Ace", .dynamicRange: "DR400", .highlight: "-1", .portraitEnhancer: "Weak"])
+        let bank = Recipe(name: "x", settings: [.filmSimulation: "Reala Ace", .dynamicRange: "DR400", .highlight: "-1"])
+        XCTAssertEqual(RecipeDiff.status(bankName: "Reala Stillness", bank: bank, target: target), .noChange, "Portrait Enhancer is never written")
+        XCTAssertEqual(RecipeDiff.status(bankName: "reala stillness", bank: bank, target: target), .changed, "a bank name is part of what loads")
+        var other = bank; other.settings[.highlight] = "2"
+        XCTAssertEqual(RecipeDiff.status(bankName: "Reala Stillness", bank: other, target: target), .changed)
+        var partial = bank; partial.settings[.dynamicRange] = nil
+        XCTAssertEqual(RecipeDiff.status(bankName: "Reala Stillness", bank: partial, target: target), .notRead, "unread isn't the same as changed")
+        partial.settings[.highlight] = "2"
+        XCTAssertEqual(RecipeDiff.status(bankName: "Reala Stillness", bank: partial, target: target), .changed)
+        XCTAssertEqual(RecipeDiff.status(bankName: nil, bank: nil, target: target), .unknown)
+        XCTAssertEqual(RecipeDiff.status(bankName: "Fujicolor Superia 100 X-M", bank: Recipe(name: "x", settings: [:]), target: Recipe(name: "Fujicolor Superia 100 — X-M5")), .noChange, "names compare as the camera stores them")
+    }
+
+    func testMonochromeSettingsLoadingSkipsDontCountAsChanges() {
+        let trix = Recipe(name: "Kodak Tri-X 400", settings: [.filmSimulation: "Acros STD", .colorChromeEffect: "Strong", .wbShiftR: "9", .wbShiftB: "-9"])
+        let bank = Recipe(name: "x", settings: [.filmSimulation: "Acros STD", .colorChromeEffect: "Off", .wbShiftR: "0", .wbShiftB: "0"])
+        XCTAssertEqual(RecipeDiff.status(bankName: "Kodak Tri-X 400", bank: bank, target: trix), .noChange)
+    }
 }

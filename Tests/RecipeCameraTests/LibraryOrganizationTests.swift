@@ -261,4 +261,28 @@ final class LibraryOrganizationTests: XCTestCase {
             XCTAssertNil(organization.loadedCatalog)
         }
     }
+
+    func testOnCameraSourceNeverShowsBanksFromBeforeALoad() {
+        let t0 = Date(timeIntervalSince1970: 1_000_000)
+        let bank = { (slot: Int, name: String) in CameraSlotSnapshot(slot: slot, name: name, properties: [:]) }
+        let kit = RecipeKit(name: "People", createdAt: t0, updatedAt: t0, slots: [RecipeKitSlot(slot: 1, recipe: Recipe(name: "New — Recipe"))])
+        let before = (title: "Before loading People", createdAt: t0.addingTimeInterval(10), banks: [bank(1, "old")])
+        let loaded = LoadedCatalog(kitID: kit.id, loadedAt: t0.addingTimeInterval(11))
+
+        XCTAssertNil(CameraBankSource.resolve(lastRead: [], loaded: nil, kits: [], backups: []))
+        // After a restart the newest backup still holds the old banks, so the verified load wins.
+        let afterLoad = CameraBankSource.resolve(lastRead: [], loaded: loaded, kits: [kit], backups: [before])
+        XCTAssertEqual(afterLoad?.banks.first?.name, "New Recipe")
+        // A read saved after the load is better evidence than the load.
+        let later = (title: "Manual", createdAt: t0.addingTimeInterval(20), banks: [bank(1, "fresh")])
+        XCTAssertEqual(CameraBankSource.resolve(lastRead: [], loaded: loaded, kits: [kit], backups: [before, later])?.banks.first?.name, "fresh")
+        // This session's read beats everything.
+        XCTAssertEqual(CameraBankSource.resolve(lastRead: [bank(1, "live")], loaded: loaded, kits: [kit], backups: [later])?.banks.first?.name, "live")
+        // A failed load clears the record, leaving only the backup, described as a saved read.
+        let failed = CameraBankSource.resolve(lastRead: [], loaded: nil, kits: [kit], backups: [before])
+        XCTAssertEqual(failed?.banks.first?.name, "old"); XCTAssertTrue(failed?.label.hasPrefix("SAVED READ") == true)
+        // A catalog edited after its load no longer describes the camera.
+        var edited = kit; edited.updatedAt = t0.addingTimeInterval(30)
+        XCTAssertEqual(CameraBankSource.resolve(lastRead: [], loaded: loaded, kits: [edited], backups: [before])?.banks.first?.name, "old")
+    }
 }

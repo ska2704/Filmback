@@ -18,7 +18,7 @@ struct RecipeVaultApp: App {
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About RecipeVault") {
-                    NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "RecipeVault", .applicationVersion: "0.5.0 · X-M5 toolkit", .credits: NSAttributedString(string: "A local photography toolkit and camera backup vault.\nUSB support requires verification on your camera.")])
+                    NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "RecipeVault", .applicationVersion: "0.6.0 · X-M5 toolkit", .credits: NSAttributedString(string: "A local photography toolkit and camera backup vault.\nUSB support requires verification on your camera.")])
                 }
             }
         }
@@ -201,40 +201,42 @@ struct WorkspaceView: View {
                     Button { section = name } label: {
                         HStack(spacing: 10) {
                             Image(systemName: icon).font(.system(size: 14)).frame(width: 20)
-                            Text(name).font(.system(size: 13, weight: section == name ? .semibold : .regular))
+                            Text(name.uppercased()).font(EdgeType.label(11, weight: section == name ? .semibold : .regular)).tracking(0.6).lineLimit(1)
                             Spacer()
-                            if name == "Library" { Text("\(store.recipes.count)").font(.system(size: 11)).monospacedDigit() }
+                            if name == "Library" { Text("\(store.recipes.count)").font(EdgeType.label(11)) }
                         }.padding(.horizontal, 12).padding(.vertical, 11)
                             .foregroundStyle(section == name ? Palette.sidebarText : Palette.sidebarMuted)
                             .background(section == name ? Palette.graphite : .clear)
                             .overlay(alignment: .leading) { if section == name { Rectangle().fill(Palette.accent).frame(width: 2) } }
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .clipShape(RoundedRectangle(cornerRadius: 5)).contentShape(Rectangle())
                     }.buttonStyle(.plain)
+                        .accessibilityLabel(name)
                         .accessibilityAddTraits(section == name ? .isSelected : [])
                         .help("Show \(name.lowercased())")
                 }
             }.padding(.horizontal, 10)
             Spacer()
-            VStack(alignment: .leading, spacing: 13) {
+            VStack(alignment: .leading, spacing: 11) {
                 Rectangle().fill(Palette.darkMetal).frame(height: 1)
-                HStack { Text("FUJIFILM").font(.system(size: 11, weight: .semibold)).tracking(0.7); Spacer(); Text("X-M5").font(.system(size: 14, weight: .semibold)) }
-                Label(camera.isConnected ? "USB connected" : "Not connected", systemImage: camera.isConnected ? "checkmark.circle.fill" : "cable.connector")
-                    .font(.system(size: 11)).foregroundStyle(Palette.sidebarMuted)
+                HStack(spacing: 7) {
+                    Circle().fill(camera.isConnected ? Palette.silverHighlight : Palette.darkMetal).frame(width: 7, height: 7).accessibilityHidden(true)
+                    Text(camera.isConnected ? "X-M5 CONNECTED" : "X-M5 NOT CONNECTED").font(EdgeType.label(10, weight: .medium)).lineLimit(1).minimumScaleFactor(0.8)
+                }
                 HStack(spacing: 5) {
                     ForEach(1...4, id: \.self) { number in
-                        Text("C\(number)").font(.system(size: 11, weight: .medium, design: .monospaced))
+                        Text("C\(number)").font(EdgeType.label(11))
                             .frame(maxWidth: .infinity).padding(.vertical, 6)
                             .background(Palette.graphite).clipShape(RoundedRectangle(cornerRadius: 3))
                     }
                 }.accessibilityElement(children: .ignore).accessibilityLabel("Four custom banks, C1 through C4")
-                Text("0.5 · X-M5 toolkit").font(.system(size: 11)).foregroundStyle(Palette.sidebarMuted)
+                Text("0.6").font(EdgeType.label(10)).foregroundStyle(Palette.sidebarMuted)
             }.foregroundStyle(Palette.sidebarText).padding(18)
-        }.frame(width: 186).background(Palette.sidebar)
+        }.frame(width: 186).background { Palette.sidebar.overlay { GrainTexture(color: Palette.brushedAluminum, opacity: 0.12) }.ignoresSafeArea() }
     }
 
     private var header: some View {
         HStack(spacing: 14) {
-            Text(section).font(.system(size: 19, weight: .semibold))
+            Text(section.uppercased()).font(EdgeType.label(15, weight: .semibold)).tracking(1.2)
             Spacer()
             if section == "Library" {
                 Button("Collections") { showCollections = true }

@@ -1,5 +1,9 @@
 # Validation
 
+## Version 0.6 load sheet, 4 November 2026
+
+The catalog page and navigation were redesigned around Option 5 of the concepts in `work/ui-concepts-2026-11-04`. `swift test --build-system native` passed **156 tests, zero failures**, with new tests for the bank status stamps and for choosing the ON CAMERA source. Release captures of Catalogs and Library were reviewed with a copy of the real data. This release changes no camera commands, and it was not run against the camera. Its sheets and menus, and the minimum window size, have not been visually checked.
+
 ## Version 0.5 catalogs, 4 November 2026
 
 `swift test --build-system native` passed **153 tests, zero failures**, including two optional checks against real files kept out of the repository: a Tether App backup against live reads of all four banks, and a real X-S20 RAF. The decoder was fitted to those same live reads, so that check confirms the fit rather than proving it independently. A baseline run on the earlier code didn't finish, so the last earlier result is the 124 recorded below.

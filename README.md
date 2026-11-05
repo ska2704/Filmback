@@ -1,6 +1,6 @@
 # RecipeVault for Mac
 
-A native, local photography toolkit for Arin's Fujifilm X-M5. Version 0.5 adds catalogs: folders of four recipes you load onto C1–C4 in one reviewed step. It also reads all four banks without switching banks, and has library organisation, recipe comparison, JPEG and RAF inspection, and portable vault backups. Built with SwiftUI, ImageCaptureCore and Vision, with no package dependencies, account, subscription or cloud service.
+A native, local photography toolkit for Arin's Fujifilm X-M5. Version 0.6 lays catalogs out as a load sheet, showing what's on the camera above what a catalog would change. Catalogs are folders of four recipes you load onto C1–C4 in one reviewed step. It also reads all four banks without switching banks, and has library organisation, recipe comparison, JPEG and RAF inspection, and portable vault backups. Built with SwiftUI, ImageCaptureCore and Vision, with no package dependencies, account, subscription or cloud service.
 
 **Status: hardware preview.** Reading the settings file and switching banks have been tried on an X-M5 running firmware 1.30 with test tools. Writing recipes and loading catalogs have only run against a simulated camera. The included app runs on Apple silicon Macs with macOS 13 or later. Source can be built for an Intel Mac on that machine. Camera writing is implemented, but successful hardware compatibility is not claimed until the first read/write/restore check on the actual body.
 
