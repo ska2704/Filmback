@@ -84,7 +84,7 @@ public enum RecipeImporter {
         if let array = document as? [[String: Any]] { objects = array }
         else if let object = document as? [String: Any] {
             if let version = object["schemaVersion"] {
-                guard isInteger(version, equalTo: 1) else { throw RecipeImportError.invalid("Unsupported RecipeVault schema version. This app understands version 1.") }
+                guard isInteger(version, equalTo: 1) else { throw RecipeImportError.invalid("Unsupported Filmback schema version. This app understands version 1.") }
             }
             if let recipes = object["recipes"] {
                 guard let array = recipes as? [[String: Any]] else { throw RecipeImportError.invalid("‘recipes’ must contain a JSON array of recipe objects.") }
@@ -290,7 +290,7 @@ public enum RecipeImporter {
     }
 
     private static func parseSimu(_ code: String, surrounding: String) throws -> ImportResult {
-        guard code.uppercased().hasPrefix("SIMU1") else { throw RecipeImportError.invalid("This Simu code uses an unsupported version. RecipeVault supports SIMU1.") }
+        guard code.uppercased().hasPrefix("SIMU1") else { throw RecipeImportError.invalid("This Simu code uses an unsupported version. Filmback supports SIMU1.") }
         let alphabet = Array("0123456789ABCDEFGHJKMNPQRSTVWXYZ")
         var bits: [UInt8] = []
         for raw in code.dropFirst(5).uppercased() {
@@ -414,7 +414,7 @@ public enum RecipeImporter {
 
 public enum RecipeExporter {
     public static func json(recipes: [Recipe]) throws -> String {
-        struct Document: Encodable { let format = "RecipeVault"; let schemaVersion = 1; let recipes: [Recipe] }
+        struct Document: Encodable { let format = "Filmback"; let schemaVersion = 1; let recipes: [Recipe] }
         for recipe in recipes { _ = try RecipeImporter.validate(recipe) }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -431,9 +431,9 @@ public enum RecipeExporter {
         if recipe.settings[.dRangePriority] == "Off" { missing += [.dynamicRange, .highlight, .shadow].filter { recipe.settings[$0] == nil } }
         if recipe.settings[.grainRoughness] != "Off", recipe.settings[.grainSize] == nil { missing.append(.grainSize) }
         if recipe.settings[.whiteBalance] == "Kelvin", recipe.settings[.kelvin] == nil { missing.append(.kelvin) }
-        guard missing.isEmpty else { throw RecipeImportError.invalid("OFR requires \(missing.map(\.label).joined(separator: ", ")). Export RecipeVault JSON to preserve this partial recipe.") }
+        guard missing.isEmpty else { throw RecipeImportError.invalid("OFR requires \(missing.map(\.label).joined(separator: ", ")). Export Filmback JSON to preserve this partial recipe.") }
         guard recipe.name.utf8.count <= 25, recipe.name.unicodeScalars.allSatisfy({ $0.isASCII }) else {
-            throw RecipeImportError.invalid("OFR names must contain at most 25 ASCII characters. Shorten the name or export RecipeVault JSON.")
+            throw RecipeImportError.invalid("OFR names must contain at most 25 ASCII characters. Shorten the name or export Filmback JSON.")
         }
         var object: [String: Any] = ["v": 1, "name": recipe.name, "sensors": recipe.sensors]
         if let url = recipe.sourceURL { object["source_url"] = url }
@@ -445,12 +445,12 @@ public enum RecipeExporter {
             if !isMono && [.monoWC, .monoMG].contains(field) { continue }
             if field == .grainSize && recipe.settings[.grainRoughness] == "Off" { continue }
             if field == .kelvin && recipe.settings[.whiteBalance] != "Kelvin" { continue }
-            guard let key = ofrKeys[field] else { throw RecipeImportError.invalid("OFR version 1 cannot carry \(field.label). Export RecipeVault JSON to retain every setting.") }
+            guard let key = ofrKeys[field] else { throw RecipeImportError.invalid("OFR version 1 cannot carry \(field.label). Export Filmback JSON to retain every setting.") }
             let value = try RecipeImporter.normalizedValue(raw, for: field)
             if field.numericRange != nil {
                 let number = Double(value)!
-                if [.monoWC, .monoMG].contains(field), !(-9...9).contains(number) { throw RecipeImportError.invalid("OFR version 1 only permits monochrome toning from -9 to +9. Export RecipeVault JSON to retain this value.") }
-                if field == .kelvin, number < 2500 { throw RecipeImportError.invalid("OFR version 1 requires Kelvin temperatures of at least 2500 K. Export RecipeVault JSON to retain this value.") }
+                if [.monoWC, .monoMG].contains(field), !(-9...9).contains(number) { throw RecipeImportError.invalid("OFR version 1 only permits monochrome toning from -9 to +9. Export Filmback JSON to retain this value.") }
+                if field == .kelvin, number < 2500 { throw RecipeImportError.invalid("OFR version 1 requires Kelvin temperatures of at least 2500 K. Export Filmback JSON to retain this value.") }
                 object[key] = number
             } else { object[key] = value }
         }

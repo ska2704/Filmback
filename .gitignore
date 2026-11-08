@@ -18,3 +18,5 @@
 /Covers/
 /work/
 /RecipeVault-before-restore-*/
+*.filmback
+/Filmback-before-restore-*/

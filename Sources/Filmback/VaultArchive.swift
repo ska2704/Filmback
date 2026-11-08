@@ -21,7 +21,7 @@ struct VaultRestoreResult {
 
 @MainActor
 enum VaultArchive {
-    static let fileExtension = "recipevault"
+    static let fileExtension = "filmback"
     static let maximumFiles = 10_000
     static let maximumFileBytes = 128 * 1_024 * 1_024
     static let maximumTotalBytes = 256 * 1_024 * 1_024
@@ -158,8 +158,8 @@ enum VaultArchive {
         let root = try checkedRoot(store.root)
         let parent = root.deletingLastPathComponent()
         let token = UUID().uuidString
-        let stage = parent.appendingPathComponent(".RecipeVault-restore-\(token)", isDirectory: true)
-        let recovery = parent.appendingPathComponent("RecipeVault-before-restore-\(token)", isDirectory: true)
+        let stage = parent.appendingPathComponent(".Filmback-restore-\(token)", isDirectory: true)
+        let recovery = parent.appendingPathComponent("Filmback-before-restore-\(token)", isDirectory: true)
         let fm = FileManager.default
         try fm.createDirectory(at: stage, withIntermediateDirectories: false)
         var committed = false

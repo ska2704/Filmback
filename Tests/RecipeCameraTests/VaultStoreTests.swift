@@ -1,12 +1,12 @@
 import XCTest
 import FujiCore
-@testable import RecipeVault
+@testable import Filmback
 
 @MainActor
 final class VaultStoreTests: XCTestCase {
     private func withTemporaryVault(_ body: (URL, VaultStore) throws -> Void) throws {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("RecipeVaultTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("FilmbackTests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         try body(root, VaultStore(root: root))
     }

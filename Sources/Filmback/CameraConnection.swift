@@ -23,13 +23,16 @@ private final class CompletionOnce<Value>: @unchecked Sendable {
 final class CameraConnection: NSObject, ObservableObject, RecipeCameraTransport, @preconcurrency ICDeviceBrowserDelegate, @preconcurrency ICCameraDeviceDelegate {
     @Published private(set) var cameras: [DiscoveredCamera] = []
     @Published private(set) var deviceInfo: PTPDeviceInfo?
-    @Published private(set) var status = "Connect your X-M5 by USB to begin."
+    @Published private(set) var status = "Connect your Fujifilm camera by USB to begin."
     @Published private(set) var isConnected = false
     /// Kept across launches: relaunching doesn't reset the camera, so the fetch stays unsafe until it's unplugged.
     var selectorWritten: Bool {
         get { UserDefaults.standard.bool(forKey: "selectorWrittenSinceUnplug") }
         set { UserDefaults.standard.set(newValue, forKey: "selectorWrittenSinceUnplug") }
     }
+    /// nil for a camera Filmback doesn't support yet. Those cameras can only produce a diagnostics report.
+    var profile: CameraProfile? { deviceInfo.flatMap(CameraProfile.matching) }
+    var canUseBanks: Bool { isConnected && profile != nil }
     private let browser = ICDeviceBrowser()
     private var devices: [String: ICCameraDevice] = [:]
     private var active: ICCameraDevice?
@@ -98,10 +101,10 @@ final class CameraConnection: NSObject, ObservableObject, RecipeCameraTransport,
             guard active === camera, sessionID == session else { throw PTPError.unsupported("Camera was disconnected.") }
             let info = try PTPDeviceInfo.parse(await command(0x1001))
             guard active === camera, sessionID == session else { throw PTPError.unsupported("Camera was disconnected.") }
-            guard info.isXM5 else { throw PTPError.unsupported("This version supports X-M5 C1–C4 only. Connected model: \(info.model).") }
-            guard info.properties.contains(0xD18C), info.properties.contains(0xD18D), [UInt16(0x1014),0x1015,0x1016].allSatisfy(info.operations.contains) else { throw PTPError.unsupported("This camera mode does not advertise the recipe protocol. Select USB RAW CONV./BACKUP RESTORE and reconnect.") }
+            let supported = CameraProfile.matching(info) != nil
+            guard !supported || info.properties.contains(0xD18C), info.properties.contains(0xD18D), [UInt16(0x1014),0x1015,0x1016].allSatisfy(info.operations.contains) else { throw PTPError.unsupported("This camera mode does not advertise the recipe protocol. Select USB RAW CONV./BACKUP RESTORE and reconnect.") }
             deviceInfo = info; isConnected = true
-            status = "\(info.model) · firmware \(info.deviceVersion) · USB connected"
+            status = "\(info.model) · firmware \(info.deviceVersion) · \(supported ? "USB connected" : "not supported yet")"
         } catch {
             if active === camera, sessionID == session { await disconnect(); status = error.localizedDescription }
             throw error

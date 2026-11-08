@@ -1,7 +1,7 @@
 import XCTest
 import PDFKit
 import FujiCore
-@testable import RecipeVault
+@testable import Filmback
 
 final class RecipeShareTests: XCTestCase {
     func testPDFPreservesAttributionHalfStepsAndLongNotesAcrossPages() throws {

@@ -1,6 +1,6 @@
 import XCTest
 import FujiCore
-@testable import RecipeVault
+@testable import Filmback
 
 @MainActor
 final class LibraryOrganizationTests: XCTestCase {

@@ -1,6 +1,6 @@
 # Third-party notices
 
-RecipeVault is an independent implementation. It is not affiliated with Fujifilm, Simu, FilmKit, Fuji X Weekly or any recipe publisher. No proprietary Fujifilm SDK, camera firmware, paid recipe catalog or GPL-licensed implementation is bundled.
+Filmback is an independent implementation. It is not affiliated with Fujifilm, Simu, FilmKit, Fuji X Weekly or any recipe publisher. No proprietary Fujifilm SDK, camera firmware, paid recipe catalog or GPL-licensed implementation is bundled.
 
 ## Protocol documentation attribution
 
@@ -47,7 +47,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - [Simu public recipe format v1](https://simurecipes.com/format), documented 8 October 2026. Independently implemented from the public format specification. The public example code `SIMU102KQY54AEMG0TN3B` is used as an interoperability fixture. No Simu application source code, binary or private API is included.
 - [Open Fuji Recipe specification](https://github.com/gosku/open-fuji-recipe), commit `888af1d1a2e7a9a155630d926423a2d0de8acc9e`. Independently implemented as an interchange format. No source code copied.
 
-Imported recipes remain attributed to their original authors and sources. RecipeVault does not ship a scraped recipe database. User-provided source URLs, author names and notes are retained where supplied. Recipe settings describe camera controls; original article text and sample photographs are not republished by this project.
+Imported recipes remain attributed to their original authors and sources. Filmback does not ship a scraped recipe database. User-provided source URLs, author names and notes are retained where supplied. Recipe settings describe camera controls; original article text and sample photographs are not republished by this project.
 
 ## Photograph metadata references
 

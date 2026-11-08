@@ -1,6 +1,6 @@
 import AppKit
 
-/// Checks that need no camera traffic, run before RecipeVault opens or changes anything on the camera.
+/// Checks that need no camera traffic, run before Filmback opens or changes anything on the camera.
 enum CameraPreflight {
     /// Other apps that also take over the camera. Only one may use it at a time.
     @MainActor static func otherCameraApps() -> [String] {

@@ -1,8 +1,14 @@
 # Validation
 
+## Version 0.7 Filmback, 8 November 2026
+
+The app was renamed from RecipeVault, and X-M5 specifics moved into a per-model `CameraProfile`. `swift test --build-system native` passed **164 tests, zero failures**, including the optional check of a real Tether App backup against live reads. New tests cover cameras without a profile (every bank operation refused, with no selector writes, object fetches or property writes), the camera report (only reads, never contains the serial number) and moving an existing vault to the new name.
+
+This version has not been run against a camera. Connecting a model other than the X-M5 has only been simulated.
+
 ## Version 0.6 load sheet, 4 November 2026
 
-The catalog page and navigation were redesigned around Option 5 of the concepts in `work/ui-concepts-2026-11-04`. `swift test --build-system native` passed **156 tests, zero failures**, with new tests for the bank status stamps and for choosing the ON CAMERA source. Release captures of Catalogs and Library were reviewed with a copy of the real data. This release changes no camera commands, and it was not run against the camera. Its sheets and menus, and the minimum window size, have not been visually checked.
+The catalog page and navigation were redesigned as a load sheet. `swift test --build-system native` passed **156 tests, zero failures**, with new tests for the bank status stamps and for choosing the ON CAMERA source. Release captures of Catalogs and Library were reviewed with a copy of the real data. This release changes no camera commands, and it was not run against the camera. Its sheets and menus, and the minimum window size, have not been visually checked.
 
 ## Version 0.5 catalogs, 4 November 2026
 
@@ -45,7 +51,7 @@ GetObjectInfo(0) reported format `0x5000` and 67,452 bytes; GetObject(0) returne
 
 ## Version 0.4 toolkit
 
-The 18 October 2026 implementation adds favourites, collections, library filters and sorting; C1–C4 kit snapshots; saved-value comparison; PDF/text sharing; local original-JPEG EXIF/MakerNote inspection; portable `.recipevault` export/restore; and X RAW Studio handoff. The existing four recipes and their approximate covers are retained. Public catalogue browsing remains deferred.
+The 18 October 2026 implementation adds favourites, collections, library filters and sorting; C1–C4 kit snapshots; saved-value comparison; PDF/text sharing; local original-JPEG EXIF/MakerNote inspection; portable `.filmback` export/restore; and X RAW Studio handoff. The existing four recipes and their approximate covers are retained. Public catalogue browsing remains deferred.
 
 On 18 October 2026, the complete native SwiftPM test suite passed **98 tests with zero failures**. The 16 archive tests passed again after final staging hardening. Coverage includes organisation persistence and corruption preservation, kit validation and snapshot independence, missing and unknown JPEG metadata, malformed binary input, portable archive integrity and restore recovery, and multi-page PDF text preservation. Debug and release builds succeeded. The app is ad-hoc signed and packaged as version 0.4.0.
 
@@ -76,7 +82,7 @@ No physical camera was connected or modified. These tests cannot establish X-M5 
 
 The current Swift 6.4 default Xcode build backend encountered generated test-bundle signing errors caused by filesystem metadata in this environment. The native SwiftPM backend completed the full suite. The app packager clears metadata only from its generated app bundle before ad-hoc signing and verifies that signature.
 
-For isolated UI testing, set `RECIPEVAULT_DATA_DIR` to an absolute temporary folder when launching the executable. Normal launches use the Application Support vault described in the README.
+For isolated UI testing, set `FILMBACK_DATA_DIR` to an absolute temporary folder when launching the executable. Normal launches use the Application Support vault described in the README.
 
 The release app was launched and visually inspected through native UI automation. Editing and saving a recipe, importing and reviewing pasted settings, and the C1–C4 camera page were verified with an isolated temporary vault. No camera was detected. The QA fixture initially lived in protected Documents and blocked startup during file access; moving only the fixture to a local temporary directory resolved that test-environment issue. The normal vault uses Application Support.
 

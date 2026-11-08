@@ -3,11 +3,11 @@ import AppKit
 import FujiCore
 
 @main
-struct RecipeVaultApp: App {
-    @StateObject private var store = VaultStore(root: ProcessInfo.processInfo.environment["RECIPEVAULT_DATA_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) })
+struct FilmbackApp: App {
+    @StateObject private var store = VaultStore(root: ProcessInfo.processInfo.environment["FILMBACK_DATA_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) })
     @StateObject private var camera = CameraConnection()
     var body: some Scene {
-        Window("RecipeVault", id: "main") {
+        Window("Filmback", id: "main") {
             WorkspaceView(store: store, camera: camera)
                 .frame(minWidth: 1040, minHeight: 700)
                 .tint(Palette.graphite)
@@ -17,8 +17,8 @@ struct RecipeVaultApp: App {
         .defaultSize(width: 1220, height: 820)
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button("About RecipeVault") {
-                    NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "RecipeVault", .applicationVersion: "0.6.0 · X-M5 toolkit", .credits: NSAttributedString(string: "A local photography toolkit and camera backup vault.\nUSB support requires verification on your camera.")])
+                Button("About Filmback") {
+                    NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Filmback", .applicationVersion: "0.7.0", .credits: NSAttributedString(string: "A local photography toolkit and camera backup vault.\nUSB support requires verification on your camera.")])
                 }
             }
         }
@@ -29,7 +29,7 @@ struct WorkspaceView: View {
     @ObservedObject var store: VaultStore
     @ObservedObject var camera: CameraConnection
     @StateObject private var organization: LibraryOrganization
-    @State private var section = ProcessInfo.processInfo.environment["RECIPEVAULT_START_SECTION"] ?? "Library"
+    @State private var section = ProcessInfo.processInfo.environment["FILMBACK_START_SECTION"] ?? "Library"
     @State private var selection: UUID?
     @State private var search = ""
     @State private var showImport = false
@@ -91,7 +91,7 @@ struct WorkspaceView: View {
                     switch section {
                     case "Camera": cameraPage
                     case "Backups": backupsPage
-                    case "Catalogs": CatalogsView(store: store, organization: organization, canWrite: camera.isConnected && !busy, lastRead: slots, onLoad: prepareCatalog, onCapture: captureCatalog, onWrite: prepare, onActivity: { activity = $0 })
+                    case "Catalogs": CatalogsView(store: store, organization: organization, canWrite: camera.canUseBanks && !busy, lastRead: slots, onLoad: prepareCatalog, onCapture: captureCatalog, onWrite: prepare, onActivity: { activity = $0 })
                     case "Compare": RecipeComparisonView(recipes: store.recipes)
                     case "Photo tools": photoToolsPage
                     case "Guide": guidePage
@@ -104,7 +104,7 @@ struct WorkspaceView: View {
                     else { Image(systemName: "internaldrive").foregroundStyle(Palette.secondary) }
                     Text(activity).lineLimit(2)
                     Spacer(minLength: 12)
-                    Text("X-M5 / C1–C4").monospacedDigit().foregroundStyle(Palette.secondary)
+                    Text(camera.profile.map { "\($0.name) / C1–C\($0.bankCount)" } ?? camera.deviceInfo?.modelName ?? "No camera").monospacedDigit().foregroundStyle(Palette.secondary)
                 }.font(.system(size: 11)).padding(.horizontal, 22).padding(.vertical, 9).background(Palette.paper)
             }.background(Palette.surface)
         }
@@ -173,7 +173,7 @@ struct WorkspaceView: View {
         .sheet(isPresented: Binding(get: { restorePreview != nil }, set: { if !$0 { restorePreview = nil; restoreURL = nil } })) {
             if let preview = restorePreview { vaultRestoreSheet(preview) }
         }
-        .alert("RecipeVault", isPresented: Binding(get: { error != nil || store.errorMessage != nil || organization.errorMessage != nil }, set: { if !$0 { error = nil; store.errorMessage = nil; organization.errorMessage = nil } })) {
+        .alert("Filmback", isPresented: Binding(get: { error != nil || store.errorMessage != nil || organization.errorMessage != nil }, set: { if !$0 { error = nil; store.errorMessage = nil; organization.errorMessage = nil } })) {
             Button("OK") { error = nil; store.errorMessage = nil; organization.errorMessage = nil }
         } message: { Text(error ?? store.errorMessage ?? organization.errorMessage ?? "") }
         .confirmationDialog("Delete this recipe from your library?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
@@ -193,8 +193,8 @@ struct WorkspaceView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 9) {
-                Image(systemName: "camera.filters").font(.system(size: 20, weight: .medium))
-                Text("RecipeVault").font(.system(size: 16, weight: .semibold)).tracking(-0.4)
+                Image(nsImage: NSApplication.shared.applicationIconImage).resizable().frame(width: 28, height: 28).accessibilityHidden(true)
+                Text("Filmback").font(.system(size: 16, weight: .semibold)).tracking(-0.4)
             }.foregroundStyle(Palette.sidebarText).padding(.horizontal, 18).padding(.top, 40).padding(.bottom, 30)
             VStack(spacing: 4) {
                 ForEach([("Library", "square.stack"), ("Catalogs", "folder"), ("Compare", "arrow.left.arrow.right"), ("Photo tools", "photo"), ("Camera", "camera"), ("Backups", "externaldrive"), ("Guide", "book.closed")], id: \.0) { name, icon in
@@ -220,7 +220,7 @@ struct WorkspaceView: View {
                 Rectangle().fill(Palette.darkMetal).frame(height: 1)
                 HStack(spacing: 7) {
                     Circle().fill(camera.isConnected ? Palette.silverHighlight : Palette.darkMetal).frame(width: 7, height: 7).accessibilityHidden(true)
-                    Text(camera.isConnected ? "X-M5 CONNECTED" : "X-M5 NOT CONNECTED").font(EdgeType.label(10, weight: .medium)).lineLimit(1).minimumScaleFactor(0.8)
+                    Text(camera.deviceInfo.map { "\($0.modelName) \(camera.profile == nil ? "NOT SUPPORTED YET" : "CONNECTED")" } ?? "CAMERA NOT CONNECTED").font(EdgeType.label(10, weight: .medium)).lineLimit(1).minimumScaleFactor(0.8)
                 }
                 HStack(spacing: 5) {
                     ForEach(1...4, id: \.self) { number in
@@ -229,7 +229,7 @@ struct WorkspaceView: View {
                             .background(Palette.graphite).clipShape(RoundedRectangle(cornerRadius: 3))
                     }
                 }.accessibilityElement(children: .ignore).accessibilityLabel("Four custom banks, C1 through C4")
-                Text("0.6").font(EdgeType.label(10)).foregroundStyle(Palette.sidebarMuted)
+                Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev").font(EdgeType.label(10)).foregroundStyle(Palette.sidebarMuted)
             }.foregroundStyle(Palette.sidebarText).padding(18)
         }.frame(width: 186).background { Palette.sidebar.overlay { GrainTexture(color: Palette.brushedAluminum, opacity: 0.12) }.ignoresSafeArea() }
     }
@@ -361,17 +361,17 @@ struct WorkspaceView: View {
                     Text("Film simulation").font(.system(size: 11)).foregroundStyle(Palette.sidebarMuted)
                 }
                 Spacer()
-                Text("X-M5").font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.sidebarMuted)
+                Text("C1–C4").font(.system(size: 12, weight: .medium)).foregroundStyle(Palette.sidebarMuted)
             }.padding(.horizontal, 16).padding(.vertical, 14).foregroundStyle(Palette.sidebarText)
                 .background(Palette.graphite).clipShape(RoundedRectangle(cornerRadius: 5)).padding(.horizontal, 24)
             HStack(spacing: 10) {
                 Button("Edit settings") { editing = recipe }
                 Menu("Write to camera…") {
                     ForEach(1...4, id: \.self) { slot in Button("Custom bank C\(slot)") { prepare(recipe, slot: slot) } }
-                }.disabled(!camera.isConnected || busy)
+                }.disabled(!camera.canUseBanks || busy)
                 Spacer()
-                if !camera.isConnected {
-                    Label("Connect X-M5 to write", systemImage: "cable.connector")
+                if !camera.canUseBanks {
+                    Label("Connect a supported camera to write", systemImage: "cable.connector")
                         .font(.system(size: 11)).foregroundStyle(Palette.secondary)
                 }
             }.padding(.horizontal, 24).padding(.vertical, 16)
@@ -426,7 +426,7 @@ struct WorkspaceView: View {
                     Text("Choose the JPEG or RAF copied from your camera or memory card. Social networks, screenshots and edited exports often remove the Fujifilm MakerNote metadata. Missing or unknown values stay unspecified.")
                         .font(.system(size: 13)).foregroundStyle(Palette.secondary).lineSpacing(4)
                     Text("RAW files and exact film rendering").font(.system(size: 15, weight: .semibold)).padding(.top, 10)
-                    Text("For RAF development with the camera’s own processor, use Fujifilm X RAW Studio with a compatible connected camera. RecipeVault reads a RAF’s recorded settings but does not render RAW files; its recipe covers are approximate.")
+                    Text("For RAF development with the camera’s own processor, use Fujifilm X RAW Studio with a compatible connected camera. Filmback reads a RAF’s recorded settings but does not render RAW files; its recipe covers are approximate.")
                         .font(.system(size: 13)).foregroundStyle(Palette.secondary).lineSpacing(4)
                     Button("Open X RAW Studio") { openRawStudio() }
                 }
@@ -447,7 +447,7 @@ struct WorkspaceView: View {
 
     private func vaultRestoreSheet(_ preview: VaultArchivePreview) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Restore your RecipeVault").font(.system(size: 23, weight: .semibold))
+            Text("Restore your Filmback").font(.system(size: 23, weight: .semibold))
             Text("Archive from \(preview.createdAt.formatted(date: .abbreviated, time: .shortened))").font(.system(size: 13)).foregroundStyle(Palette.secondary)
             Divider()
             Text("\(preview.recipeCount) recipes · \(preview.kitCount) catalogs · \(preview.collectionCount) collections\n\(preview.backupCount) camera backups · \(preview.coverCount) covers")
@@ -495,7 +495,7 @@ struct WorkspaceView: View {
             VStack(alignment: .leading, spacing: 25) {
                 HStack(alignment: .top, spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(camera.deviceInfo?.model ?? "FUJIFILM X-M5").font(.system(size: 27, weight: .semibold)).tracking(-0.5)
+                        Text(camera.deviceInfo?.model ?? "Your camera").font(.system(size: 27, weight: .semibold)).tracking(-0.5)
                         Label(camera.isConnected ? "Connected over USB" : "Camera not connected", systemImage: camera.isConnected ? "checkmark.circle.fill" : "cable.connector")
                             .font(.system(size: 12)).foregroundStyle(camera.isConnected ? Palette.ink : Palette.secondary)
                         Text(camera.status).font(.system(size: 12)).foregroundStyle(Palette.secondary).textSelection(.enabled)
@@ -511,13 +511,20 @@ struct WorkspaceView: View {
                     }.accessibilityElement(children: .ignore).accessibilityLabel("Four custom recipe banks")
                 }
                 HStack {
-                    if camera.isConnected {
+                    if camera.isConnected && camera.profile == nil {
+                        Button("Copy camera report") { copyCameraReport() }.buttonStyle(.borderedProminent).tint(Palette.accent).disabled(busy)
+                            .help("Copies this camera’s model, firmware and supported settings, without its serial number")
+                        Link("Open a GitHub issue", destination: URL(string: "https://github.com/ska2704/Filmback/issues/new?template=camera-report.yml")!)
+                        Button("Disconnect") { run("Disconnecting…") { await camera.disconnect(); slots = [] } }.disabled(busy)
+                    } else if camera.isConnected {
                         Button("Read C1–C4") { readCamera() }.buttonStyle(.borderedProminent).tint(Palette.accent).disabled(busy)
                             .help("Reads all four banks in one fetch without switching banks")
                         Button("Save full backup") { saveFullBackup() }.disabled(busy)
                             .help("Saves the same settings file Tether App makes")
                         Button("Back up recipe banks") { backUpSlots() }.disabled(busy)
                             .help("Reads every value by switching banks, then restores the selection")
+                        Button("Copy camera report") { copyCameraReport() }.disabled(busy)
+                            .help("Copies this camera’s model, firmware and supported settings, without its serial number")
                         Button("Disconnect") { run("Disconnecting…") { await camera.disconnect(); slots = [] } }.disabled(busy)
                     } else {
                         ForEach(camera.cameras) { discovered in
@@ -529,7 +536,11 @@ struct WorkspaceView: View {
                     }
                 }
                 preflight
+                if let info = camera.deviceInfo, camera.profile == nil {
+                    StatusNote(text: "Filmback can see your \(info.modelName), but it hasn’t been verified on this model, so its banks can’t be read or changed. You can help add it: copy the camera report and paste it into a GitHub issue. The report only reads from the camera and leaves out the serial number.", symbol: "exclamationmark.triangle", warning: true)
+                }
                 Divider()
+                if camera.profile != nil || !camera.isConnected {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack { Text("Custom banks").font(.system(size: 15, weight: .semibold)); Spacer(); Text("Read the camera to inspect saved settings").font(.system(size: 11)).foregroundStyle(Palette.secondary) }
                     StatusNote(text: "Read C1–C4 doesn’t switch banks, but dynamic range, D range priority, monochrome tone and grain that’s switched on aren’t decoded from it yet. Back up recipe banks reads those too.")
@@ -538,11 +549,12 @@ struct WorkspaceView: View {
                     }
                 }
                 Divider()
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     Text("USB setup").font(.system(size: 14, weight: .semibold))
                     Text("Use a USB data cable. Set CONNECTION MODE to USB RAW CONV./BACKUP RESTORE and USB POWER SUPPLY/COMM SETTING to POWER SUPPLY OFF/COMM ON. Close Tether App, X Acquire, X RAW Studio and other camera apps.")
                         .font(.system(size: 12)).foregroundStyle(Palette.secondary).lineSpacing(4)
-                    StatusNote(text: "X-M5 USB writing is experimental. The app checks advertised settings and saves a backup before writes. Keep a Tether App backup until your first write has been checked on the camera.", symbol: "exclamationmark.triangle", warning: true)
+                    StatusNote(text: "Writing to the camera over USB is experimental. The app checks advertised settings and saves a backup before writes. Keep a Tether App backup until your first write has been checked on the camera.", symbol: "exclamationmark.triangle", warning: true)
                 }
             }.padding(28)
         }
@@ -587,7 +599,7 @@ struct WorkspaceView: View {
             }
             Menu("Choose recipe…") {
                 ForEach(store.recipes) { recipe in Button(recipe.name) { prepare(recipe, slot: number) } }
-            }.disabled(!camera.isConnected || busy || store.recipes.isEmpty)
+            }.disabled(!camera.canUseBanks || busy || store.recipes.isEmpty)
         }.padding(.horizontal, 16).padding(.vertical, 16).background(Palette.paper.opacity(0.7))
             .overlay(RoundedRectangle(cornerRadius: 5).stroke(Palette.line, lineWidth: 0.7))
     }
@@ -612,19 +624,19 @@ struct WorkspaceView: View {
                         .font(.system(size: 13)).foregroundStyle(Palette.secondary)
                 }
                 HStack(spacing: 10) {
-                    Button("Back up recipe banks") { backUpSlots() }.buttonStyle(.borderedProminent).tint(Palette.accent).disabled(!camera.isConnected || busy)
-                    Button("Save full backup") { saveFullBackup() }.disabled(!camera.isConnected || busy)
+                    Button("Back up recipe banks") { backUpSlots() }.buttonStyle(.borderedProminent).tint(Palette.accent).disabled(!camera.canUseBanks || busy)
+                    Button("Save full backup") { saveFullBackup() }.disabled(!camera.canUseBanks || busy)
                     Button("Open Tether App") { openAcquire() }
                     Spacer()
                     Button { NSWorkspace.shared.open(store.root) } label: { Label("Show vault", systemImage: "folder") }
                 }
-                StatusNote(text: "Recipe snapshots contain readable recipe properties, not every camera setting or your photos. Restore a full backup with Fujifilm Tether App; RecipeVault doesn’t write full backups to the camera.")
+                StatusNote(text: "Recipe snapshots contain readable recipe properties, not every camera setting or your photos. Restore a full backup with Fujifilm Tether App; Filmback doesn’t write full backups to the camera.")
                 Divider()
                 HStack { Text("Backup history").font(.system(size: 14, weight: .semibold)); Spacer(); Text("\(store.backups.count) saved").font(.system(size: 12)).foregroundStyle(Palette.secondary) }
                 if store.backups.isEmpty {
                     VStack(alignment: .leading, spacing: 9) {
                         Label("No backups saved", systemImage: "externaldrive").font(.system(size: 16, weight: .medium))
-                        Text("Connect your X-M5 to capture its recipe banks, or import an existing settings backup.").font(.system(size: 12)).foregroundStyle(Palette.secondary)
+                        Text("Connect your camera to capture its recipe banks, or import an existing settings backup.").font(.system(size: 12)).foregroundStyle(Palette.secondary)
                         Button("Import backup file…") { importBackup() }.padding(.top, 5)
                     }.padding(.vertical, 26)
                 }
@@ -663,10 +675,10 @@ struct WorkspaceView: View {
                 guide("2", "Organise and prepare", "Mark favourites, filter by film simulation and group recipes into collections using the recipe actions menu. Save a catalog of four recipes for an outing. Catalogs keep their own copies, so later library edits won’t change them. Compare two recipes to see their differences, and export a PDF or copy the settings with attribution.")
                 guide("3", "Connect and read", "Set the camera’s USB mode to USB RAW CONV./BACKUP RESTORE, use a data cable, and close other camera apps. Connect in Camera, then read C1–C4. This reads the settings file in one fetch without switching banks. No recipe is applied just by connecting.")
                 guide("4", "Load a catalog", "Choose a catalog and load it, or send one recipe to a bank. Reviewing switches the bank selector to read each bank, then restores it. The app shows the planned changes, saves a backup, writes the included settings, and reads them back. A missing setting means keep the bank’s current value. For still photos, assign the custom bank to still mode and set the film simulation dial to C so the bank’s simulation is used.")
-                guide("5", "Keep recoverable backups", "Save a full backup in Camera or Backups. Restore that file with Tether App’s RESTORE CAMERA SETTINGS command. Recipe-bank snapshots cover known recipe fields only. Export a complete RecipeVault file to preserve your library, organisation, covers and stored camera backups together. Vault restore affects this Mac’s data; camera restore is a separate reviewed operation.")
+                guide("5", "Keep recoverable backups", "Save a full backup in Camera or Backups. Restore that file with Tether App’s RESTORE CAMERA SETTINGS command. Recipe-bank snapshots cover known recipe fields only. Export a complete Filmback file to preserve your library, organisation, covers and stored camera backups together. Vault restore affects this Mac’s data; camera restore is a separate reviewed operation.")
                 Divider()
                 Text("Compatibility").font(.system(size: 14, weight: .semibold))
-                StatusNote(text: "This build targets the X-M5’s four custom banks. Its USB path is based on public Fujifilm PTP research, with strict property checks. X-M5 firmware 1.30 rejects the camera’s supported-values queries, so values are checked against a researched X-M5_0100 profile instead. A change is refused when RecipeVault could not undo it exactly from its own backup. Reading C1–C4 and switching banks have been tested on an X-M5 running firmware 1.30. Writing recipes and loading catalogs have not. After switching banks, the camera’s USB stopped responding once when its settings file was fetched next, so RecipeVault won’t fetch that file again until the camera has been unplugged. If a property is unsupported or a write cannot be verified, the app stops. A partial write may leave some settings changed; review the camera and restore the saved bank as needed.", symbol: "exclamationmark.triangle", warning: true)
+                StatusNote(text: "Reading and writing banks is verified on the X-M5 only. Other Fujifilm cameras can connect and produce a report for adding support. Its USB path is based on public Fujifilm PTP research, with strict property checks. X-M5 firmware 1.30 rejects the camera’s supported-values queries, so values are checked against a researched X-M5_0100 profile instead. A change is refused when Filmback could not undo it exactly from its own backup. Reading C1–C4 and switching banks have been tested on an X-M5 running firmware 1.30. Writing recipes and loading catalogs have not. After switching banks, the camera’s USB stopped responding once when its settings file was fetched next, so Filmback won’t fetch that file again until the camera has been unplugged. If a property is unsupported or a write cannot be verified, the app stops. A partial write may leave some settings changed; review the camera and restore the saved bank as needed.", symbol: "exclamationmark.triangle", warning: true)
                 HStack(spacing: 20) {
                     Link("X-M5 manual", destination: URL(string: "https://app.fujifilm-dsc.com/en-int/manual/x-m5/")!)
                     Link("Tether App", destination: URL(string: "https://www.fujifilm-x.com/en-us/support/download/software/tether-app/")!)
@@ -701,6 +713,16 @@ struct WorkspaceView: View {
 
     private func readCamera() {
         run("Reading C1–C4…") { try requireCameraToSelf(); slots = try await service.readSlots(); activity = "Read \(slots.count) banks. No recipe settings were changed." }
+    }
+    private func copyCameraReport() {
+        run("Reading camera details…") {
+            try requireCameraToSelf()
+            let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "development"
+            let report = try await service.diagnosticsReport(appVersion: version)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(report, forType: .string)
+            activity = "Camera report copied, without the serial number. Nothing on the camera changed."
+        }
     }
     private func backUpSlots() {
         run("Reading every bank and saving a backup…") {
@@ -812,8 +834,8 @@ struct WorkspaceView: View {
     }
     private func exportVault() {
         let panel = NSSavePanel()
-        panel.title = "Export complete RecipeVault"
-        panel.nameFieldStringValue = "RecipeVault-\(Date().formatted(.iso8601.year().month().day().dateSeparator(.dash))).recipevault"
+        panel.title = "Export complete vault"
+        panel.nameFieldStringValue = "Filmback-\(Date().formatted(.iso8601.year().month().day().dateSeparator(.dash))).\(VaultArchive.fileExtension)"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         run("Checking files and exporting vault…") {
             let preview = try VaultArchive.export(store: store, to: url)
@@ -821,7 +843,7 @@ struct WorkspaceView: View {
         }
     }
     private func previewVaultRestore() {
-        let panel = NSOpenPanel(); panel.title = "Choose a complete RecipeVault archive"; panel.allowsMultipleSelection = false
+        let panel = NSOpenPanel(); panel.title = "Choose a complete Filmback archive"; panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         run("Checking archive before restore…") { restorePreview = try VaultArchive.preview(at: url); restoreURL = url }
     }
@@ -843,7 +865,7 @@ struct WorkspaceView: View {
         if panel.runModal() == .OK, let url = panel.url { try data.write(to: url, options: .atomic) }
     }
     private func importBackup() {
-        let panel = NSOpenPanel(); panel.title = "Choose a RecipeVault or Fujifilm settings backup"; panel.allowsMultipleSelection = false
+        let panel = NSOpenPanel(); panel.title = "Choose a Filmback or Fujifilm settings backup"; panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             do {
                 let attributes = try url.resourceValues(forKeys: [.fileSizeKey])

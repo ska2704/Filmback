@@ -60,7 +60,7 @@ enum RecipeInput {
         defer { session.invalidateAndCancel() }
 
         var request = URLRequest(url: url)
-        request.setValue("RecipeVault/1.0 (macOS; public recipe import)", forHTTPHeaderField: "User-Agent")
+        request.setValue("Filmback/1.0 (macOS; public recipe import)", forHTTPHeaderField: "User-Agent")
         request.setValue("text/html, application/xhtml+xml, text/plain, application/json", forHTTPHeaderField: "Accept")
         let (bytes, response) = try await session.bytes(for: request)
         guard let response = response as? HTTPURLResponse,

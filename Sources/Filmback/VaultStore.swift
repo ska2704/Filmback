@@ -38,9 +38,18 @@ final class VaultStore: ObservableObject {
         return encoder
     }()
 
+    /// Filmback was called RecipeVault before 0.7. Its vault moves over once; if that fails it stays in use where it is.
+    static func defaultRoot(in support: URL) -> URL {
+        let root = support.appendingPathComponent("Filmback", isDirectory: true)
+        let legacy = support.appendingPathComponent("RecipeVault", isDirectory: true)
+        let files = FileManager.default
+        guard !files.fileExists(atPath: root.path), files.fileExists(atPath: legacy.path) else { return root }
+        do { try files.moveItem(at: legacy, to: root); return root }
+        catch { return legacy }
+    }
+
     init(root: URL? = nil, coverResources: URL? = Bundle.main.resourceURL) {
-        self.root = root ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("RecipeVault", isDirectory: true)
+        self.root = root ?? Self.defaultRoot(in: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0])
         self.coverResources = coverResources
         do {
             try FileManager.default.createDirectory(at: self.root.appendingPathComponent("Backups"), withIntermediateDirectories: true)
@@ -143,7 +152,7 @@ final class VaultStore: ObservableObject {
         return archive
     }
 
-    /// C1–C4 from a stored backup, or nil when the file isn't a format RecipeVault can read.
+    /// C1–C4 from a stored backup, or nil when the file isn't a format Filmback can read.
     func banks(in backup: BackupRecord) -> [CameraSlotSnapshot]? {
         if backup.kind == .recipeSlots { return (try? archive(backup))?.slots }
         guard let data = try? payload(backup) else { return nil }

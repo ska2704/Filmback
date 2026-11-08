@@ -68,7 +68,7 @@ struct LibraryOrganizationState: Codable, Equatable, Sendable {
 
     func validate() throws {
         guard formatVersion == 1 else {
-            throw LibraryOrganizationError.message("This organization file uses an unsupported version. Update RecipeVault before opening it.")
+            throw LibraryOrganizationError.message("This organization file uses an unsupported version. Update Filmback before opening it.")
         }
         guard Set(collections.map(\.id)).count == collections.count,
               Set(kits.map(\.id)).count == kits.count else {
@@ -85,10 +85,10 @@ struct LibraryOrganizationState: Codable, Equatable, Sendable {
 
     static func validateSlots(_ slots: [RecipeKitSlot]) throws {
         guard (1...4).contains(slots.count) else {
-            throw LibraryOrganizationError.message("An X-M5 kit needs between one and four recipe slots.")
+            throw LibraryOrganizationError.message("A catalog needs between one and four recipes.")
         }
         guard slots.allSatisfy({ (1...4).contains($0.slot) }) else {
-            throw LibraryOrganizationError.message("X-M5 kits use C1 through C4 only.")
+            throw LibraryOrganizationError.message("Catalogs use C1 through C4 only.")
         }
         guard Set(slots.map(\.slot)).count == slots.count else {
             throw LibraryOrganizationError.message("Each slot can appear only once in a kit.")

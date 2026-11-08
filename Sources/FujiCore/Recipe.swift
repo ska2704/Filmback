@@ -163,7 +163,7 @@ public struct Recipe: Identifiable, Codable, Equatable, Sendable {
         for (key, value) in raw {
             guard let field = RecipeField(rawValue: key) else {
                 throw DecodingError.dataCorruptedError(forKey: .settings, in: values,
-                    debugDescription: "Unknown recipe field: \(key). Update RecipeVault before opening this file.")
+                    debugDescription: "Unknown recipe field: \(key). Update Filmback before opening this file.")
             }
             settings[field] = value
         }

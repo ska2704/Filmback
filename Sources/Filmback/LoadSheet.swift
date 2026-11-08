@@ -1,7 +1,7 @@
 import SwiftUI
 import FujiCore
 
-/// What RecipeVault last knew about one custom bank. The app can't see changes made on the camera itself.
+/// What Filmback last knew about one custom bank. The app can't see changes made on the camera itself.
 struct CameraBank: Identifiable, Equatable {
     let slot: Int
     let name: String

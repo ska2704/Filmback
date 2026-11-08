@@ -1,0 +1,25 @@
+name: Camera report
+description: Help add support for your Fujifilm camera
+labels: ["camera support"]
+body:
+  - type: markdown
+    attributes:
+      value: In Filmback, connect your camera and choose **Copy camera report**. It only reads from the camera and leaves out the serial number.
+  - type: textarea
+    id: report
+    attributes:
+      label: Camera report
+      description: Paste the report here. Please don't attach backup files, because they can contain your serial number.
+      render: markdown
+    validations:
+      required: true
+  - type: dropdown
+    id: help
+    attributes:
+      label: Can you help test on this camera?
+      options:
+        - "Yes, I can test builds"
+        - "Yes, and I can write Swift"
+        - "No, just sharing the report"
+    validations:
+      required: true

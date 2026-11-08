@@ -1,6 +1,6 @@
-# RecipeVault design
+# Filmback design
 
-RecipeVault is a native macOS working tool for one photographer’s Fujifilm X-M5: collect recipes, inspect settings, assign C1–C4, and preserve camera backups. The user requested a Fujifilm-inspired interface that feels deliberately designed rather than a generic generated dashboard.
+Filmback is a native macOS working tool for Fujifilm photographers, verified on the X-M5: collect recipes, inspect settings, assign C1–C4, and preserve camera backups. The user requested a Fujifilm-inspired interface that feels deliberately designed rather than a generic generated dashboard.
 
 ## Direction
 

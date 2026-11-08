@@ -50,25 +50,32 @@ struct RecipeWriteReport {
 final class RecipeCameraService {
     let connection: any RecipeCameraTransport
     private var busy = false
-    private var capabilityProfile: XM5CapabilityProfile?
+    private var capabilityProfile: (any CameraValueValidator)?
     init(connection: any RecipeCameraTransport) { self.connection = connection }
 
     private func begin() throws -> PTPDeviceInfo {
         guard !busy else { throw PTPError.unsupported("Wait for the current camera operation to finish.") }
-        guard connection.isConnected, let info = connection.deviceInfo, info.isXM5 else { throw PTPError.unsupported("Connect your X-M5 first.") }
+        guard connection.isConnected, let info = connection.deviceInfo else { throw PTPError.unsupported("Connect your camera first.") }
+        guard CameraProfile.matching(info) != nil else { throw PTPError.unsupported("\(info.modelName) isn’t supported yet, so its banks can’t be read or changed.") }
         try connection.acquireOperation()
         busy = true; capabilityProfile = nil; return info
     }
     private func get(_ code: UInt16) async throws -> Data { try await connection.command(0x1015, parameters: [UInt32(code)]) }
     private func set(_ code: UInt16, _ data: Data) async throws { _ = try await connection.command(0x1016, parameters: [UInt32(code)], outData: data) }
-    private func profile() async throws -> XM5CapabilityProfile {
+    /// Only valid after begin(), which refuses any camera without a profile.
+    private var cameraProfile: CameraProfile {
+        get throws {
+            guard let info = connection.deviceInfo, let profile = CameraProfile.matching(info) else { throw PTPError.unsupported("Connect a supported camera first.") }
+            return profile
+        }
+    }
+    private func profile() async throws -> any CameraValueValidator {
         if let capabilityProfile { return capabilityProfile }
         guard let info = connection.deviceInfo,
               [UInt16(0xD16E), 0xD186, 0xD187].allSatisfy(info.properties.contains) else {
             throw PTPError.unsupported("The camera cannot identify a supported recipe capability profile.")
         }
-        let resolved = try XM5CapabilityProfile.resolve(device: info, usbMode: await get(0xD16E),
-            condition: await get(0xD186), compatibility: await get(0xD187))
+        let resolved = try cameraProfile.resolveValidator(info, await get(0xD16E), await get(0xD186), await get(0xD187))
         capabilityProfile = resolved
         return resolved
     }
@@ -89,7 +96,8 @@ final class RecipeCameraService {
         try descriptor.validate(value)
     }
     private func select(_ slot: Int) async throws {
-        guard (1...4).contains(slot) else { throw PTPError.unsupported("X-M5 has C1–C4. No other slot will be accessed.") }
+        let profile = try cameraProfile
+        guard profile.banks.contains(slot) else { throw PTPError.unsupported("\(profile.name) has C1–C\(profile.bankCount). No other slot will be accessed.") }
         let payload = PTP.u16(UInt16(slot))
         // Always write: after a power cycle the selector can already read 1 while the live
         // properties still hold placeholders, and writing it is what loads the bank.
@@ -108,7 +116,7 @@ final class RecipeCameraService {
     }
     private func preservingSelector<T>(_ operation: () async throws -> T) async throws -> T {
         let old = try await PTP.scalar(get(0xD18C))
-        guard (1...4).contains(old) else { throw PTPError.unsupported("Camera returned an unknown slot selector (\(old)); no bank will be changed.") }
+        guard try cameraProfile.banks.contains(old) else { throw PTPError.unsupported("Camera returned an unknown slot selector (\(old)); no bank will be changed.") }
         let result: T
         do { result = try await operation() }
         catch {
@@ -133,14 +141,14 @@ final class RecipeCameraService {
     private func validateRecovery(writes: [PTPPropertyWrite], name: String, before: CameraSlotSnapshot) async throws {
         for write in writes where !RecipeWireCodec.equivalent(property: write.property, before.properties[write.property], write.data) {
             func refusal(_ reason: String = "") -> PTPError {
-                PTPError.unsupported("C\(before.slot) has a value for \(write.label) that RecipeVault cannot restore exactly. \(reason) No recipe settings will be written. Preserve it with Fujifilm Tether App and choose a bank with understood settings before trying again.")
+                PTPError.unsupported("C\(before.slot) has a value for \(write.label) that Filmback cannot restore exactly. \(reason) No recipe settings will be written. Preserve it with Fujifilm Tether App and choose a bank with understood settings before trying again.")
             }
             guard let original = before.properties[write.property] else { throw refusal() }
             do { try await validate(write.property, RecipeWireCodec.writableValue(property: write.property, value: original)) }
             catch PTPError.unsupported(let reason) { throw refusal(reason) }
         }
         if name != before.name, !before.name.isEmpty, PTP.safeName(before.name) != before.name {
-            throw PTPError.unsupported("The original C\(before.slot) name cannot be restored exactly by RecipeVault. No recipe settings will be written.")
+            throw PTPError.unsupported("The original C\(before.slot) name cannot be restored exactly by Filmback. No recipe settings will be written.")
         }
     }
     private func readSlot(_ slot: Int, info: PTPDeviceInfo) async throws -> CameraSlotSnapshot {
@@ -161,7 +169,7 @@ final class RecipeCameraService {
     }
     private func readAll(_ info: PTPDeviceInfo) async throws -> [CameraSlotSnapshot] {
         var slots: [CameraSlotSnapshot] = []
-        for slot in 1...4 { slots.append(try await readSlot(slot,info:info)) }; return slots
+        for slot in try cameraProfile.banks { slots.append(try await readSlot(slot,info:info)) }; return slots
     }
 
     /// Reads all four banks from the settings object, without touching the bank selector.
@@ -171,7 +179,7 @@ final class RecipeCameraService {
         guard !connection.selectorWritten, info.operations.contains(0x1008), info.operations.contains(0x1009) else {
             return try await preservingSelector { try await readAll(info) }
         }
-        return try XM5BackupDecoder.decode(try await fetchSettingsObject(info))
+        return try cameraProfile.decodeSettingsObject(try await fetchSettingsObject(info))
     }
 
     /// Reads every property of every bank. This switches the bank selector, then restores it.
@@ -202,7 +210,7 @@ final class RecipeCameraService {
             catch PTPError.unsupported(let reason) { throw PTPError.unsupported("\(recipe.name) on C\(slot): \(reason)") }
         }
         try await validate(0xD18D, PTP.string(name))
-        if capabilityProfile != nil { warnings.append("Using the researched X-M5_0100 value profile because this camera does not provide property descriptors. Camera-side limits still apply; any rejection stops the write.") }
+        if capabilityProfile != nil { warnings.append("Using the researched \(try cameraProfile.generation) value profile because this camera does not provide property descriptors. Camera-side limits still apply; any rejection stops the write.") }
         return RecipeWritePlan(slot:slot,name:name,writes:writes,before:baseline,warnings:warnings,device:info)
     }
 
@@ -215,11 +223,15 @@ final class RecipeCameraService {
 
     /// Plans a whole catalog against one read of the camera. Writes nothing except the bank selector.
     func planCatalog(id: UUID, name: String, recipes: [Int: Recipe]) async throws -> CatalogWritePlan {
-        guard Set(recipes.keys) == Set(1...4) else { throw PTPError.unsupported("A catalog needs a recipe for each of C1, C2, C3 and C4 before it can be loaded.") }
         let info = try begin(); defer { busy = false; connection.releaseOperation() }
+        let banks = try cameraProfile.banks
+        guard Set(recipes.keys) == Set(banks) else { 
+            let names = banks.map { "C\($0)" }
+            throw PTPError.unsupported("A catalog needs a recipe for each of \(names.dropLast().joined(separator: ", ")) and \(names.last ?? "") before it can be loaded.")
+         }
         return try await preservingSelector {
             var plans: [RecipeWritePlan] = []
-            for slot in 1...4 {
+            for slot in banks {
                 plans.append(try await makePlan(recipe: recipes[slot]!, baseline: try await readSlot(slot,info:info), info: info))
             }
             return CatalogWritePlan(catalogID: id, catalogName: name, plans: plans)
@@ -260,7 +272,7 @@ final class RecipeCameraService {
             try await validateRecovery(writes: writes, name: snapshot.name, before: baseline)
             var warnings = ["Restore applies saved recipe values the bank was using, and its original name. Image size, image quality, lens modulation and color space remain unchanged. Use FUJIFILM TETHER APP for a whole camera restore."]
             if missing > 0 { warnings.append("This backup is missing \(missing) recipe values. Those settings will stay as they are on the camera.") }
-            if capabilityProfile != nil { warnings.append("Using the researched X-M5_0100 value profile because this camera does not provide property descriptors. Camera-side limits still apply; any rejection stops the write.") }
+            if capabilityProfile != nil { warnings.append("Using the researched \(try cameraProfile.generation) value profile because this camera does not provide property descriptors. Camera-side limits still apply; any rejection stops the write.") }
             return RecipeWritePlan(slot:slot,name:snapshot.name,writes:writes,before:baseline,warnings:warnings,device:info)
         }
     }
@@ -277,7 +289,7 @@ final class RecipeCameraService {
         guard plans.allSatisfy({ $0.writes.allSatisfy { RecipeWireCodec.writableProperties.contains($0.property) } }) else { throw PTPError.unsupported("Unknown or live-state write refused.") }
         return try await preservingSelector {
             let all = try await readAll(info)
-            guard all.count == 4, all.allSatisfy({ $0.readErrors.isEmpty }),
+            guard all.count == (try cameraProfile.bankCount), all.allSatisfy({ $0.readErrors.isEmpty }),
                   plans.allSatisfy({ plan in all.first(where: { $0.slot == plan.slot }) == plan.before }) else {
                 throw PTPError.changed("Camera settings changed or a bank could not be read. No recipe was written. Read the camera and prepare the change again.")
             }
@@ -370,6 +382,23 @@ final class RecipeCameraService {
             hint = " The camera refused \(writing.displayValue).\(required)"
         }
         return PTPError.changed("C\(slot) write stopped. \(error.localizedDescription)\(hint) Accepted properties: \(codes.isEmpty ? "none" : codes).\(done) The pre-write backup is saved; do not assume the entire recipe was applied.")
+    }
+
+    /// Describes the camera for a support request. Works on any connected model, and only ever reads.
+    func diagnosticsReport(appVersion: String) async throws -> String {
+        guard !busy else { throw PTPError.unsupported("Wait for the current camera operation to finish.") }
+        guard connection.isConnected, let info = connection.deviceInfo else { throw PTPError.unsupported("Connect your camera first.") }
+        try connection.acquireOperation()
+        busy = true; defer { busy = false; connection.releaseOperation() }
+        var values: [UInt16: Data] = [:], errors: [UInt16: String] = [:]
+        for code in CameraDiagnostics.propertiesToRead(for: info) {
+            do { values[code] = try await get(code) }
+            catch {
+                errors[code] = error.localizedDescription
+                if !connection.isConnected { throw error }
+            }
+        }
+        return CameraDiagnostics.report(device: info, values: values, errors: errors, appVersion: appVersion)
     }
 
     /// Fetches the whole settings object, the same file Tether App saves as a backup.

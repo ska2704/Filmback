@@ -29,6 +29,6 @@ jobs:
           xcodebuild -version
           swift --version
       - name: Test parsers, persistence and simulated camera safety
-        run: swift test --build-system native --scratch-path "$RUNNER_TEMP/recipevault-build"
+        run: swift test --build-system native --scratch-path "$RUNNER_TEMP/filmback-build"
       - name: Build release executable
-        run: swift build --build-system native --scratch-path "$RUNNER_TEMP/recipevault-build" --configuration release
+        run: swift build --build-system native --scratch-path "$RUNNER_TEMP/filmback-build" --configuration release

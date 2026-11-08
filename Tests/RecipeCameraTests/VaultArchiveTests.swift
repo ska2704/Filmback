@@ -1,6 +1,6 @@
 import XCTest
 import FujiCore
-@testable import RecipeVault
+@testable import Filmback
 
 @MainActor
 final class VaultArchiveTests: XCTestCase {
@@ -32,7 +32,7 @@ final class VaultArchiveTests: XCTestCase {
     private func archiveWithRecipe(_ directory: URL) throws -> (VaultStore, URL) {
         let store = VaultStore(root: directory.appendingPathComponent("source"), coverResources: nil)
         try store.save(recipe())
-        let url = directory.appendingPathComponent("portable.recipevault")
+        let url = directory.appendingPathComponent("portable.filmback")
         try VaultArchive.export(store: store, to: url)
         return (store, url)
     }
@@ -54,7 +54,7 @@ final class VaultArchiveTests: XCTestCase {
             try organization.saveKit(name: "Weekend", slots: [RecipeKitSlot(slot: 2, recipe: kitRecipe)])
             try put(Data("Preserve extra notes".utf8), at: source.root.appendingPathComponent("Notes/trip.txt"))
             try FileManager.default.createDirectory(at: source.root.appendingPathComponent("Empty"), withIntermediateDirectories: false)
-            let archive = directory.appendingPathComponent("portable.recipevault")
+            let archive = directory.appendingPathComponent("portable.filmback")
             let preview = try VaultArchive.export(store: source, to: archive)
             XCTAssertEqual(preview.recipeCount, 1)
             XCTAssertEqual(preview.backupCount, 1)
@@ -90,7 +90,7 @@ final class VaultArchiveTests: XCTestCase {
     func testEmptyVaultExportsAndRestoresWithValidIndexes() async throws {
         try withFixture { directory in
             let source = VaultStore(root: directory.appendingPathComponent("empty"), coverResources: nil)
-            let archive = directory.appendingPathComponent("empty.recipevault")
+            let archive = directory.appendingPathComponent("empty.filmback")
             let preview = try VaultArchive.export(store: source, to: archive)
             XCTAssertEqual(preview.recipeCount, 0)
             XCTAssertEqual(preview.backupCount, 0)
@@ -174,7 +174,7 @@ final class VaultArchiveTests: XCTestCase {
     func testMissingBackupAndMissingLibraryOrKitCoverPreventExport() async throws {
         try withFixture { directory in
             let store = VaultStore(root: directory.appendingPathComponent("source"), coverResources: nil)
-            let archive = directory.appendingPathComponent("missing.recipevault")
+            let archive = directory.appendingPathComponent("missing.filmback")
             let covered = recipe(cover: "missing.png")
             try store.save(covered)
             XCTAssertThrowsError(try VaultArchive.export(store: store, to: archive))
@@ -209,7 +209,7 @@ final class VaultArchiveTests: XCTestCase {
             try put(Data([1, 2]), at: outside)
             try FileManager.default.createSymbolicLink(at: store.root.appendingPathComponent("linked.txt"), withDestinationURL: outside)
             XCTAssertThrowsError(try VaultArchive.export(store: store, to: archive))
-            let alias = directory.appendingPathComponent("alias.recipevault")
+            let alias = directory.appendingPathComponent("alias.filmback")
             try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: archive)
             XCTAssertThrowsError(try VaultArchive.preview(at: alias))
         }
@@ -230,7 +230,7 @@ final class VaultArchiveTests: XCTestCase {
             XCTAssertEqual(destination.recipes, [original])
             XCTAssertEqual(VaultStore(root: destination.root).recipes, [original])
             XCTAssertEqual(try Data(contentsOf: destination.root.appendingPathComponent("organization.json")), before)
-            XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath: directory.path).contains { $0.hasPrefix(".RecipeVault-restore-") })
+            XCTAssertFalse(try FileManager.default.contentsOfDirectory(atPath: directory.path).contains { $0.hasPrefix(".Filmback-restore-") })
         }
     }
 
@@ -303,7 +303,7 @@ final class VaultArchiveTests: XCTestCase {
     func testExportInsideVaultIsRefused() async throws {
         try withFixture { directory in
             let (store, _) = try archiveWithRecipe(directory)
-            XCTAssertThrowsError(try VaultArchive.export(store: store, to: store.root.appendingPathComponent("recursive.recipevault")))
+            XCTAssertThrowsError(try VaultArchive.export(store: store, to: store.root.appendingPathComponent("recursive.filmback")))
         }
     }
 }

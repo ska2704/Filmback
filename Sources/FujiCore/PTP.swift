@@ -105,7 +105,7 @@ public struct PTPDeviceInfo: Codable, Equatable {
         let operations = try r.u16Array(); _ = try r.u16Array(); let properties = try r.u16Array(); _ = try r.u16Array(); _ = try r.u16Array()
         return try Self(manufacturer: r.string(), model: r.string(), deviceVersion: r.string(), serialNumber: r.string(), operations: operations, properties: properties)
     }
-    public var isXM5: Bool { model.uppercased().replacingOccurrences(of: "FUJIFILM", with: "").trimmingCharacters(in: .whitespaces) == "X-M5" }
+    public var isXM5: Bool { modelName == "X-M5" }
 }
 
 public struct PTPPropertyDescriptor {

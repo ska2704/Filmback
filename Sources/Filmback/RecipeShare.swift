@@ -16,7 +16,7 @@ enum RecipeShare {
             lines.append("")
         }
         if !recipe.notes.isEmpty { lines += ["Field notes", recipe.notes, ""] }
-        lines.append("Only listed settings are specified. Exported with RecipeVault.")
+        lines.append("Only listed settings are specified. Exported with Filmback.")
         return lines.joined(separator: "\n")
     }
 

@@ -1,0 +1,21 @@
+name: Bug report
+description: Something in Filmback isn't working
+labels: ["bug"]
+body:
+  - type: input
+    id: setup
+    attributes:
+      label: Filmback version, camera model and firmware
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+      description: Include any error text. Please remove your camera's serial number.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce

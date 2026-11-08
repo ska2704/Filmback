@@ -213,9 +213,9 @@ final class PhotoInspectorTests: XCTestCase {
         XCTAssertThrowsError(try FujifilmPhotoInspector.embeddedJPEG(inRAF: raf(jpeg: jpeg, offset: UInt32.max)))
     }
 
-    /// Set RECIPEVAULT_RAF_FIXTURE to check a real RAF, which stays out of the repository.
+    /// Set FILMBACK_RAF_FIXTURE to check a real RAF, which stays out of the repository.
     func testRealRAFSettingsAreRead() throws {
-        guard let path = ProcessInfo.processInfo.environment["RECIPEVAULT_RAF_FIXTURE"] else { throw XCTSkip("No RAF fixture configured.") }
+        guard let path = ProcessInfo.processInfo.environment["FILMBACK_RAF_FIXTURE"] else { throw XCTSkip("No RAF fixture configured.") }
         let result = try FujifilmPhotoInspector.inspect(Data(contentsOf: URL(fileURLWithPath: path)), filename: "fixture.raf")
         XCTAssertNotNil(result.result.recipes.first?.settings[.filmSimulation])
     }

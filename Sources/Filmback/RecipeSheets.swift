@@ -195,7 +195,7 @@ struct ImportView: View {
                             Text("\(recipe.settings.count) settings").font(.system(size: 12)).foregroundStyle(Palette.secondary)
                         }
                         if let slot = recipe.suggestedSlot {
-                            Text("Source kit bank: C\(slot). Choose an X-M5 bank explicitly when writing.")
+                            Text("Source kit bank: C\(slot). Choose a bank explicitly when writing.")
                                 .font(.system(size: 12)).foregroundStyle(Palette.secondary)
                         }
                         SettingsGrid(recipe: recipe)
@@ -254,7 +254,7 @@ struct WriteReviewView: View {
     var body: some View {
         VStack(spacing: 0) {
             RecipeSheetHeader(title: "Review C\(plan.slot)", symbol: "camera",
-                              subtitle: "\(plan.writes.count) changes ready for your X-M5")
+                              subtitle: "\(plan.writes.count) changes ready for your camera")
             VStack(alignment: .leading, spacing: 16) {
                 Text(recipeName).font(.system(size: 22, weight: .semibold))
                 Text("Replacing recipe settings in “\(plan.before.name)”. The app will save your current banks before it writes, then check each change by reading it back.")
@@ -310,10 +310,10 @@ struct CatalogReviewView: View {
     var body: some View {
         VStack(spacing: 0) {
             RecipeSheetHeader(title: "Load \(plan.catalogName)", symbol: "folder",
-                              subtitle: plan.changeCount == 0 ? "Your X-M5 already holds this catalog" : "\(plan.changeCount) changes across C1–C4")
+                              subtitle: plan.changeCount == 0 ? "Your camera already holds this catalog" : "\(plan.changeCount) changes across C1–C4")
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    Text("RecipeVault saves all four banks first, writes each one, then reads every bank back to check it.")
+                    Text("Filmback saves all four banks first, writes each one, then reads every bank back to check it.")
                         .font(.system(size: 13)).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
                     ForEach(plan.plans) { bank in
                         RecipeSheetSection(title: "C\(bank.slot) · \(bank.name)") {

@@ -69,10 +69,10 @@ final class XM5BackupDecoderTests: XCTestCase {
         XCTAssertEqual(RecipeWireCodec.writableValue(property: 0xD195, value: PTP.u16(6)), PTP.u16(1))
     }
 
-    /// Set RECIPEVAULT_BACKUP_FIXTURE and RECIPEVAULT_LIVE_FIXTURE to check a real backup. Those files stay out of the repository.
+    /// Set FILMBACK_BACKUP_FIXTURE and FILMBACK_LIVE_FIXTURE to check a real backup. Those files stay out of the repository.
     func testRealBackupMatchesLiveReads() throws {
         let environment = ProcessInfo.processInfo.environment
-        guard let backup = environment["RECIPEVAULT_BACKUP_FIXTURE"], let live = environment["RECIPEVAULT_LIVE_FIXTURE"] else {
+        guard let backup = environment["FILMBACK_BACKUP_FIXTURE"], let live = environment["FILMBACK_LIVE_FIXTURE"] else {
             throw XCTSkip("No camera fixture configured.")
         }
         let banks = try XM5BackupDecoder.decode(Data(contentsOf: URL(fileURLWithPath: backup)))

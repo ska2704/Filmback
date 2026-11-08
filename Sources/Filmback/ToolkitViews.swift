@@ -188,7 +188,7 @@ struct CatalogsView: View {
         func list(_ status: RecipeDiff.BankStatus) -> [String] { (1...4).filter { statuses[$0] == status }.map { "C\($0)" } }
         var parts: [String] = []
         let changed = list(.changed), unread = list(.notRead)
-        if changed.isEmpty && unread.isEmpty { parts.append("This catalog matches what RecipeVault last knew about the camera.") }
+        if changed.isEmpty && unread.isEmpty { parts.append("This catalog matches what Filmback last knew about the camera.") }
         if !changed.isEmpty { parts.append("\(changed.joined(separator: ", ")) would change.") }
         if !unread.isEmpty { parts.append("\(unread.joined(separator: ", ")) can’t be fully compared, because the last read didn’t include every setting.") }
         parts.append("Changes made on the camera itself don’t show here until you read it again.")
@@ -375,7 +375,7 @@ struct KitEditorView: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(kit == nil ? "New catalog" : "Edit catalog").font(.system(size: 22, weight: .semibold))
-                Text("Choose a recipe for each of your X-M5’s four custom banks.").font(.system(size: 12)).foregroundStyle(Palette.secondary)
+                Text("Choose a recipe for each of your camera’s four custom banks.").font(.system(size: 12)).foregroundStyle(Palette.secondary)
             }.padding(24)
             Divider()
             Form {

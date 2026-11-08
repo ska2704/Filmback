@@ -1,6 +1,6 @@
 import XCTest
 import FujiCore
-@testable import RecipeVault
+@testable import Filmback
 
 @MainActor
 private final class FakeCamera: RecipeCameraTransport {
@@ -87,6 +87,41 @@ private final class FakeCamera: RecipeCameraTransport {
 
 @MainActor
 final class CameraSafetyTests: XCTestCase {
+    private func unsupportedCamera() -> FakeCamera {
+        let camera = FakeCamera()
+        let info = camera.deviceInfo!
+        camera.deviceInfo = PTPDeviceInfo(manufacturer: info.manufacturer, model: "X-T5", deviceVersion: "2.10", serialNumber: info.serialNumber,
+                                          operations: info.operations + [0x1008, 0x1009], properties: info.properties)
+        return camera
+    }
+    func testUnsupportedModelCannotTouchBanks() async throws {
+        let camera = unsupportedCamera()
+        let service = RecipeCameraService(connection: camera)
+        func assertRefused<T>(_ work: () async throws -> T) async {
+            do { _ = try await work(); XCTFail("Expected a refusal") }
+            catch { XCTAssertTrue("\(error.localizedDescription)".contains("X-T5"), "\(error.localizedDescription)") }
+        }
+        await assertRefused { try await service.readSlots() }
+        await assertRefused { try await service.readAllProperties() }
+        await assertRefused { try await service.readFullBackup() }
+        await assertRefused { try await service.plan(recipe: Recipe(name: "Test"), slot: 1) }
+        await assertRefused { try await service.planCatalog(id: UUID(), name: "Test", recipes: [:]) }
+        XCTAssertEqual(camera.selectorWrites, 0)
+        XCTAssertEqual(camera.objectFetches, 0)
+        XCTAssertEqual(camera.savedWrites, [])
+        XCTAssertFalse(camera.leased)
+    }
+    func testDiagnosticsReportOnlyReadsAndOmitsSerial() async throws {
+        let camera = unsupportedCamera()
+        let report = try await RecipeCameraService(connection: camera).diagnosticsReport(appVersion: "test")
+        XCTAssertTrue(report.contains("Model: X-T5"))
+        XCTAssertFalse(report.contains("TEST"))
+        XCTAssertEqual(camera.selectorWrites, 0)
+        XCTAssertEqual(camera.objectFetches, 0)
+        XCTAssertEqual(camera.savedWrites, [])
+        XCTAssertFalse(camera.leased)
+        XCTAssertFalse(camera.selectorWritten)
+    }
     func testPersistenceFailurePreventsRecipeMutation() async throws {
         let camera = FakeCamera()
         let tested = RecipeCameraService(connection:camera)

@@ -28,7 +28,7 @@ public enum XM5BackupDecoder {
 
     public static func decode(_ data: Data) throws -> [CameraSlotSnapshot] {
         guard isSettingsObject(data) else {
-            throw PTPError.unsupported("This is not an X-M5 settings backup in a format RecipeVault can read.")
+            throw PTPError.unsupported("This is not an X-M5 settings backup in a format Filmback can read.")
         }
         let bytes = [UInt8](data)
         return try nameOffsets.enumerated().map { index, offset in

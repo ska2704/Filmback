@@ -2,18 +2,18 @@
 import PackageDescription
 
 let package = Package(
-    name: "RecipeVault",
+    name: "Filmback",
     platforms: [.macOS(.v13)],
     products: [
         .library(name: "FujiCore", targets: ["FujiCore"]),
-        .executable(name: "RecipeVault", targets: ["RecipeVault"])
+        .executable(name: "Filmback", targets: ["Filmback"])
     ],
     targets: [
         .target(name: "FujiCore"),
-        .executableTarget(name: "RecipeVault", dependencies: ["FujiCore"], linkerSettings: [
+        .executableTarget(name: "Filmback", dependencies: ["FujiCore"], linkerSettings: [
             .linkedFramework("SwiftUI"), .linkedFramework("ImageCaptureCore"), .linkedFramework("Vision")
         ]),
         .testTarget(name: "FujiCoreTests", dependencies: ["FujiCore"]),
-        .testTarget(name: "RecipeCameraTests", dependencies: ["FujiCore", "RecipeVault"])
+        .testTarget(name: "RecipeCameraTests", dependencies: ["FujiCore", "Filmback"])
     ]
 )
